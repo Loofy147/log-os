@@ -1,0 +1,34 @@
+
+;; core/evaluators.l0
+;; Defines multiple evaluator strategies in Log-Os L0 syntax.
+;; Each evaluator is a function that takes (ast env) and returns a result map {:value ..., :time-ms ...}
+
+(defn eval-baseline [ast env]
+  ;; straightforward interpreter evaluation
+  (let [t0 (current-time-ms)
+        val (interpret ast env)
+        t1 (current-time-ms)]
+    {:value val :time-ms (- t1 t0) :strategy :baseline}))
+
+(defn eval-with-caching [ast env cache-key]
+  ;; cache-key is a string identifying the function + args
+  (if (cache-has? cache-key)
+    (let [t0 (current-time-ms)
+          v (cache-get cache-key)
+          t1 (current-time-ms)]
+      {:value v :time-ms (- t1 t0) :strategy :cache-hit})
+    (let [t0 (current-time-ms)
+          v (interpret ast env)
+          t1 (current-time-ms)]
+      (cache-put cache-key v)
+      {:value v :time-ms (- t1 t0) :strategy :cache-miss})))
+
+(defn eval-jit-sim [ast env state]
+  ;; Simulate a JIT warmup penalty on first runs
+  (let [seen? (jit-seen? ast)
+        t0 (current-time-ms)
+        _ (if (not seen?) (simulate-jit-compile ast)) ;; pay compile cost once
+        v (interpret ast env)
+        t1 (current-time-ms)]
+    (when (not seen?) (jit-mark-seen ast))
+    {:value v :time-ms (- t1 t0) :strategy :jit}))

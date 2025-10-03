@@ -8,23 +8,25 @@ from core.utils import lisp_str
 
 def main():
     """Starts the Read-Eval-Print Loop for Log-Os."""
-    global_env = create_global_env()
+    global_env = create_global_env(evaluate)
 
-    # Load the kernel to bootstrap the language
+    # Load the kernel and core libraries to bootstrap the language
+    core_files = ["kernel.l0", "core/evaluators.l0", "core/orchestrator.l0"]
     try:
-        with open("kernel.l0") as f:
-            kernel_source = f.read()
-        asts = parse_stream(kernel_source)
-        for ast in asts:
-            evaluate(ast, global_env)
-        print("Kernel loaded.")
-    except FileNotFoundError:
-        print("Warning: kernel.l0 not found. Language will be in minimal mode.")
+        for core_file in core_files:
+            with open(core_file) as f:
+                source = f.read()
+            asts = parse_stream(source)
+            for ast in asts:
+                evaluate(ast, global_env)
+            print(f"Loaded {core_file}.")
+    except FileNotFoundError as e:
+        print(f"Warning: {e.filename} not found. Language may be in a degraded state.")
     except LogosError as e:
-        print(f"FATAL: Error loading kernel.l0: {e}")
+        print(f"FATAL: Error loading core file: {e}")
         return
 
-    print("Log-Os 0.0.1 REPL")
+    print("\nLog-Os 0.0.1 REPL")
     print("Press Ctrl+C to exit.")
 
     while True:

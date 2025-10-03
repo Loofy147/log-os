@@ -8,9 +8,16 @@ import math
 import operator as op
 import functools
 import os
+import time
+import random
 
 from .types import Symbol, List, Atom
 from .errors import LogosEvaluationError, LogosAssertionError
+
+# Global state for orchestrator primitives
+L0_CACHE = {}
+L0_JIT_SEEN_ASTS = set()
+
 
 class Environment(dict):
     """A dictionary with an outer scope and a separate space for macros."""
@@ -42,7 +49,7 @@ class Environment(dict):
 from .parser import parse
 from .utils import lisp_str
 
-def create_global_env() -> Environment:
+def create_global_env(eval_func) -> Environment:
     """Creates and returns the default global environment."""
     env = Environment()
     env.update({
@@ -93,8 +100,24 @@ def create_global_env() -> Environment:
         Symbol('list-directory'): lambda path: [Symbol(item) for item in os.listdir(path)],
 
         # Hash-map functions
-        Symbol('hash-get'): lambda h_map, key: h_map.get(key),
+        Symbol('hash-get'): lambda h_map, key, default=None: h_map.get(key, default),
         Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
+
+        # Orchestrator Primitives
+        Symbol('interpret'): lambda ast, env: eval_func(ast, env),
+        Symbol('current-time-ms'): lambda: time.time() * 1000,
+        Symbol('random'): random.random,
+        Symbol('gamma-sample'): lambda alpha: random.gammavariate(alpha, 1.0),
+        Symbol('log'): math.log,
+        Symbol('sqrt'): math.sqrt,
+        Symbol('cos'): math.cos,
+        Symbol('cache-get'): lambda key, default=None: L0_CACHE.get(key, default),
+        Symbol('cache-put'): lambda key, value: L0_CACHE.update({key: value}) and value,
+        Symbol('cache-has?'): lambda key: key in L0_CACHE,
+        Symbol('jit-seen?'): lambda ast: lisp_str(ast) in L0_JIT_SEEN_ASTS,
+        Symbol('jit-mark-seen'): lambda ast: L0_JIT_SEEN_ASTS.add(lisp_str(ast)),
+        Symbol('simulate-jit-compile'): lambda ast: time.sleep(0.001), # Lightweight placeholder
+        Symbol('cache-key'): lambda ast, env: lisp_str(ast),
 
         # Utility functions
         Symbol('member?'): lambda item, lst: item in lst,

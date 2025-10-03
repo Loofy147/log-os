@@ -1,0 +1,23 @@
+
+;; stdlib/analysis/benchmark.l0
+;; Provides a benchmark macro that runs an expression N times and returns stats
+(defn now-ms [] (current-time-ms)) ;; requires host primitive current-time-ms returning ms
+
+(defn stats [xs]
+  (let [n (count xs)
+        mean (/ (reduce + xs) n)
+        var (/ (reduce + (map (fn [x] (* (- x mean) (- x mean))) xs)) n)
+        sd (sqrt var)]
+    {:n n :mean mean :sd sd}))
+
+(defmacro benchmark [expr n]
+  ;; Usage: (benchmark (heavy-fn arg) 100)
+  (let [times (loop [i 0 acc []]
+                (if (< i n)
+                  (let [t0 (now-ms)
+                        _ (expr)
+                        t1 (now-ms)
+                        dt (- t1 t0)]
+                    (recur (+ i 1) (conj acc dt)))
+                  acc))]
+    (stats times)))

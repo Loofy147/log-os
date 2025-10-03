@@ -1,0 +1,11 @@
+
+;; stdlib/math/beta.l0
+;; Simple Beta distribution sampler and helpers for Log-Os pseudo-language
+;; Note: this is written in Log-Os syntax (L0). The real interpreter must provide `random` and `log` primitives.
+(defn random-beta [alpha beta]
+  ;; Uses approximation via inverse transform using two gamma draws (if gamma available).
+  ;; Fallback: use Math library if available. This is a shim specifying expected semantics.
+  ;; Returns a float in (0,1).
+  (let [x (gamma-sample alpha)
+        y (gamma-sample beta)]
+    (/ x (+ x y))))

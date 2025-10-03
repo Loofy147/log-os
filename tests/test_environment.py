@@ -4,6 +4,7 @@ import pytest
 from core.environment import Environment, create_global_env
 from core.errors import LogosEvaluationError
 from core.types import Symbol
+from core.interpreter import evaluate
 
 def test_env_creation():
     env = Environment(params=[Symbol('x'), Symbol('y')], args=[1, 2])
@@ -29,7 +30,7 @@ def test_env_find_not_found():
         env.find(Symbol('non_existent_var'))
 
 def test_create_global_env():
-    global_env = create_global_env()
+    global_env = create_global_env(evaluate)
     assert Symbol('+') in global_env
     assert Symbol('car') in global_env
     assert Symbol('pi') in global_env

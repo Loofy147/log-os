@@ -1,0 +1,10 @@
+
+;; stdlib/math/random.l0
+;; Random helpers for Log-Os
+(defn rand-uniform [] (random)) ;; expects host `random` primitive returning [0,1)
+(defn rand-normal [mu sigma]
+  ;; Box-Muller transform using host random()
+  (let [u1 (rand-uniform)
+        u2 (rand-uniform)
+        z0 (* (sqrt (* -2 (log u1))) (cos (* 2 3.141592653589793 u2)))]
+    (+ mu (* sigma z0))))
