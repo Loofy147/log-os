@@ -7,8 +7,8 @@ class Symbol(str):
     """A LISP-style symbol, which is a distinct type from a string."""
     pass
 
-# An Atom is a Symbol, a number, a boolean, or a string.
-Atom = (Symbol, int, float, str, bool)
+# An Atom is a Symbol, a number, a boolean, a string, or a hash-map.
+Atom = (Symbol, int, float, str, bool, dict)
 
 # A List is a nested structure of other Expressions.
 # We use a forward reference here as List contains Expression.

@@ -1,0 +1,20 @@
+;; bootstrap/call-graph-builder.l0
+;; The goal of this program is to perform a semantic analysis of the entire
+;; Log-Os codebase (.l0 files) and build a complete call graph.
+;; This will demonstrate a deeper, semantic understanding of the code.
+
+;; High-level plan:
+;; 1. Load the necessary analysis tools from the standard library.
+;;    (load "stdlib/analysis/scope-analyzer.l0")
+;;    (load "stdlib/analysis/dependency-analyzer.l0")
+;;
+;; 2. Define a function, (build-project-graph root-dir), that will:
+;;    a. Use the (list-directory ...) primitive to find all .l0 files.
+;;    b. Read and parse all files into a list of ASTs.
+;;    c. For each function definition in each AST:
+;;       - Use the dependency-analyzer to find all functions it calls.
+;;       - Store this relationship in a hash-map representing the graph.
+;;    d. Return the graph.
+;;
+;; This file is currently a placeholder. Its implementation will be the
+;; primary goal of the next development cycle.

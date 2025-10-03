@@ -8,6 +8,8 @@ of the expression.
 from .types import Symbol, List
 from .environment import Environment
 from .errors import LogosEvaluationError
+from .parser import parse
+
 
 def evaluate(x, env: Environment):
     """
@@ -72,6 +74,32 @@ def evaluate(x, env: Environment):
         lambda_expr = ['lambda', params, body]
         eval_expr = [lambda_expr] + values
         return evaluate(eval_expr, env)
+
+    elif op == 'load':
+        # (load "filepath")
+        (filepath_expr,) = args
+        filepath = evaluate(filepath_expr, env)
+        if not isinstance(filepath, str):
+            raise LogosEvaluationError(f"load expected a string filepath, but got {type(filepath)}")
+
+        with open(filepath) as f:
+            source = f.read()
+
+        # Wrap the file content in a 'begin' block to handle multiple expressions
+        ast = parse(f"(begin {source})")
+        return evaluate(ast, env)
+
+    elif op == 'hash-map':
+        # (hash-map key1 val1 key2 val2 ...)
+        if len(args) % 2 != 0:
+            raise LogosEvaluationError("hash-map requires an even number of arguments for key-value pairs.")
+
+        hash_map = {}
+        for i in range(0, len(args), 2):
+            key = evaluate(args[i], env)
+            value = evaluate(args[i+1], env)
+            hash_map[key] = value
+        return hash_map
 
     else:
         # Procedure call

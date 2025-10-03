@@ -7,6 +7,7 @@ This environment contains built-in procedures and standard library functions.
 import math
 import operator as op
 import functools
+import os
 
 from .types import Symbol, List, Atom
 
@@ -73,5 +74,10 @@ def create_global_env() -> Environment:
         # Reflective I/O
         Symbol('read-source'): lambda filepath: parse(f"(begin {open(filepath).read()})"),
         Symbol('write-source'): lambda filepath, data: open(filepath, 'w').write(lisp_str(data)),
+        Symbol('list-directory'): lambda path: [Symbol(item) for item in os.listdir(path)],
+
+        # Hash-map functions
+        Symbol('hash-get'): lambda h_map, key: h_map.get(key),
+        Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
     })
     return env
