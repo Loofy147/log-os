@@ -49,13 +49,11 @@ The current version is a surprisingly capable LISP dialect with a rich set of pr
     python repl.py
     ```
 
-## The Bootstrapping Plan
+## Roadmap & Vision
 
-The core interpreter is now stable and feature-rich. The next phase focuses on using these capabilities to build sophisticated analysis tools in Log-Os itself.
+This project is more than just a language; it's a long-term research exploration into computational intelligence and self-improving systems. We have a formal, multi-phase plan to guide our development from a simple interpreter to a fully reflective, self-aware system.
 
-1.  **Phase 0 (Complete):** Build a stable and powerful `Logos-0` interpreter in Python.
-2.  **Phase 1 (Current):** Use `Logos-0` to write a suite of static analysis tools for Log-Os code. This will involve creating a standard library (`stdlib/`) for analysis, starting with tools that can build a full call graph of a project.
-3.  **Phase 2 and beyond:** Use these analysis tools to enable the system to reason about its own structure, complexity, and behavior, paving the way for automated refactoring, optimization, and eventually, self-compilation.
+**[Read the full project roadmap in ROADMAP.md](ROADMAP.md)**
 
 ## Project Structure
 
