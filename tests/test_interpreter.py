@@ -55,3 +55,32 @@ def test_eval_lambda_and_defun(global_env):
 def test_eval_undefined_symbol(global_env):
     with pytest.raises(LogosEvaluationError):
         evaluate(parse("undefined_symbol"), global_env)
+
+def test_eval_load(global_env):
+    # The 'load_sample.l0' file defines 'loaded-var' and 'loaded-func'
+    evaluate(parse('(load "tests/load_sample.l0")'), global_env)
+    # Check that the variable is defined
+    assert evaluate(parse("loaded-var"), global_env) == 42
+    # Check that the function is defined and works
+    assert evaluate(parse("(loaded-func 10)"), global_env) == 20
+
+def test_eval_list_directory(global_env):
+    # Check that list-directory returns a list of symbols for a known directory
+    file_list = evaluate(parse('(list-directory "core")'), global_env)
+    assert isinstance(file_list, list)
+    assert Symbol('interpreter.py') in file_list
+    assert Symbol('parser.py') in file_list
+
+def test_eval_hash_map(global_env):
+    # Create a hash-map
+    evaluate(parse('(defvar my-map (hash-map "key1" 100 \'key2 #t))'), global_env)
+    # Test getting values
+    assert evaluate(parse('(hash-get my-map "key1")'), global_env) == 100
+    assert evaluate(parse('(hash-get my-map \'key2)'), global_env) is True
+    assert evaluate(parse('(hash-get my-map "non-existent")'), global_env) is None
+    # Test setting a value
+    evaluate(parse('(hash-set! my-map "key1" 200)'), global_env)
+    assert evaluate(parse('(hash-get my-map "key1")'), global_env) == 200
+    # Test setting a new key
+    evaluate(parse('(hash-set! my-map \'new-key "new-value")'), global_env)
+    assert evaluate(parse('(hash-get my-map \'new-key)'), global_env) == "new-value"

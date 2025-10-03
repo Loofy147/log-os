@@ -1,0 +1,3 @@
+;; A sample file for testing the (load) special form.
+(defvar loaded-var 42)
+(defun loaded-func (x) (* x 2))
