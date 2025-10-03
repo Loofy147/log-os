@@ -77,7 +77,6 @@ def parse_stream(source_code: str) -> list:
         asts.append(read_from_tokens(tokens))
     return asts
 
-
 def atom(token: str):
     """
     Converts a token to its appropriate Python type.
