@@ -8,10 +8,6 @@ from core.errors import LogosEvaluationError, LogosAssertionError
 from core.types import Symbol
 
 
-@pytest.fixture
-def global_env():
-    return create_global_env()
-
 def test_eval_number(global_env):
     assert evaluate(parse("42"), global_env) == 42
 

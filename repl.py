@@ -1,6 +1,6 @@
 # repl.py
 import sys
-from core.parser import parse
+from core.parser import parse, parse_stream
 from core.interpreter import evaluate
 from core.environment import create_global_env
 from core.errors import LogosError
@@ -9,6 +9,21 @@ from core.utils import lisp_str
 def main():
     """Starts the Read-Eval-Print Loop for Log-Os."""
     global_env = create_global_env()
+
+    # Load and evaluate the kernel
+    try:
+        with open("kernel.l0") as f:
+            kernel_source = f.read()
+        asts = parse_stream(kernel_source)
+        for ast in asts:
+            evaluate(ast, global_env)
+        print("Kernel loaded.")
+    except FileNotFoundError:
+        print("Warning: kernel.l0 not found. Language will be in minimal mode.")
+    except LogosError as e:
+        print(f"FATAL: Error loading kernel.l0: {e}")
+        return
+
     print("Log-Os 0.0.1 REPL")
     print("Press Ctrl+C to exit.")
 

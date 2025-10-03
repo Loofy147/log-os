@@ -8,7 +8,7 @@ of the expression.
 from .types import Symbol, List, Macro
 from .environment import Environment
 from .errors import LogosEvaluationError
-from .parser import parse
+from .parser import parse_stream
 
 
 def evaluate(x, env: Environment):
@@ -56,6 +56,13 @@ def evaluate(x, env: Environment):
         (symbol, expr) = args
         env[symbol] = evaluate(expr, env)
         return env[symbol]
+
+    elif op == 'defmacro':
+        # (defmacro name params . body)
+        (name, params, *body) = args
+        body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
+        env[name] = Macro(params, body_expr, env)
+        return None
 
     elif op == 'set!':
         # (set! symbol expr)
@@ -135,22 +142,6 @@ def evaluate(x, env: Environment):
                 return True
         return val
 
-    elif op == 'let':
-        # (let ((var val) ...) body...)
-        (bindings, *body) = args
-        if not body:
-            raise LogosEvaluationError("let form must have a body.")
-
-        params = [b[0] for b in bindings]
-        values = [b[1] for b in bindings]
-
-        # If there's more than one expression in the body, wrap it in a 'begin'
-        body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
-
-        lambda_expr = ['lambda', params, body_expr]
-        eval_expr = [lambda_expr] + values
-        return evaluate(eval_expr, env)
-
     elif op == 'load':
         # (load "filepath")
         (filepath_expr,) = args
@@ -161,9 +152,12 @@ def evaluate(x, env: Environment):
         with open(filepath) as f:
             source = f.read()
 
-        # Wrap the file content in a 'begin' block to handle multiple expressions
-        ast = parse(f"(begin {source})")
-        return evaluate(ast, env)
+        # Use parse_stream and evaluate each expression
+        asts = parse_stream(source)
+        result = None
+        for ast in asts:
+            result = evaluate(ast, env)
+        return result
 
     elif op == 'hash-map':
         # (hash-map key1 val1 key2 val2 ...)
@@ -178,11 +172,38 @@ def evaluate(x, env: Environment):
         return hash_map
 
     else:
-        # Procedure call
+        # Procedure call or Macro expansion
         proc = evaluate(op, env)
-        if not callable(proc):
+
+        if isinstance(proc, Macro):
+            # It's a macro. Expand it and evaluate the expansion.
+            macro_env = Environment(outer=proc.env)
+
+            # Bind macro parameters to unevaluated arguments
+            rest_param = None
+            fixed_params = proc.params
+            if Symbol('.') in proc.params:
+                dot_index = proc.params.index(Symbol('.'))
+                fixed_params = proc.params[:dot_index]
+                rest_param = proc.params[dot_index + 1]
+
+                if len(args) < len(fixed_params):
+                    raise LogosEvaluationError(f"Macro '{op}' expects at least {len(fixed_params)} arguments, got {len(args)}")
+                macro_env.update(zip(fixed_params, args))
+                macro_env[rest_param] = list(args[len(fixed_params):])
+            else:
+                if len(proc.params) != len(args):
+                    raise LogosEvaluationError(f"Macro '{op}' expects {len(proc.params)} arguments, got {len(args)}")
+                macro_env.update(zip(proc.params, args))
+
+            # Evaluate the macro body to get the expanded code, then evaluate the expanded code.
+            expanded_code = evaluate(proc.body, macro_env)
+            return evaluate(expanded_code, env)
+
+        elif not callable(proc):
             raise LogosEvaluationError(f"'{op}' is not a procedure.")
 
+        # It's a regular procedure call.
         evaluated_args = [evaluate(arg, env) for arg in args]
         try:
             return proc(*evaluated_args)

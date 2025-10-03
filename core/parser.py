@@ -56,6 +56,21 @@ def read_from_tokens(tokens: list):
     else:
         return atom(token)
 
+def parse_stream(source_code: str) -> list:
+    """
+    Parses a string of Log-Os source code containing multiple expressions
+    into a list of ASTs.
+    """
+    tokens = tokenize(source_code)
+    if not tokens:
+        return []
+
+    asts = []
+    while tokens:
+        asts.append(read_from_tokens(tokens))
+    return asts
+
+
 def atom(token: str):
     """
     Converts a token to its appropriate Python type.

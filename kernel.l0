@@ -1,0 +1,38 @@
+;; kernel.l0
+;; The self-hosted heart of the Log-Os language.
+;; Core forms are redefined here as macros without using quasiquote.
+;; NOTE: This kernel uses '.' for variadic arguments, matching the core interpreter.
+
+;; (defmacro name params body) is a special form handled by the Python core.
+
+;; Defines 'unless', which executes the body only if the condition is false.
+;; (unless condition . body) -> (if (not condition) (begin body...) #f)
+(defmacro unless (condition . body)
+  (list 'if (list 'not condition)
+        (cons 'begin body)
+        '#f))
+
+;; Defines 'let' for local variable bindings.
+;; (let (bindings...) . body) -> ((lambda (vars...) (begin body...)) vals...)
+(defmacro let (bindings . body)
+  (cons (list 'lambda
+              (map car bindings)
+              (cons 'begin body))
+        (map (lambda (b) (car (cdr b))) bindings)))
+
+;; Defines 'cond' for multi-branch conditionals.
+;; (cond (pred body...)...) -> expands recursively into nested 'if' statements.
+(defmacro cond (. clauses)
+  (if (> (length clauses) 0)
+      ;; (if predicate (begin body...) (cond ...rest))
+      (list 'if (car (car clauses))
+            (cons 'begin (cdr (car clauses)))
+            (cons 'cond (cdr clauses)))
+      ;; else, if no clauses match
+      '#f))
+
+;; Defines a simple 'assert' macro for internal tests.
+;; (assert expression) -> (unless expression (error "Assertion failed"))
+(defmacro assert (expression)
+  (list 'unless expression
+        (list 'error "Assertion failed")))
