@@ -8,7 +8,48 @@ of the expression.
 from .types import Symbol, List, Macro
 from .environment import Environment
 from .errors import LogosEvaluationError
-from .parser import parse_stream
+from .parser import parse
+from .types import List, Symbol
+
+
+def expand_quasiquote(x, env, level):
+    """
+    Recursively expands a quasiquoted expression, handling nesting levels
+    of unquote and unquote-splicing.
+    """
+    if not isinstance(x, List) or not x:
+        return x
+
+    op, *rest = x
+
+    if op == Symbol('quasiquote'):
+        # Nested quasiquote, increase nesting level and recurse
+        return [Symbol('quasiquote')] + [expand_quasiquote(rest[0], env, level + 1)]
+
+    if op == Symbol('unquote') or op == Symbol('unquote-splicing'):
+        if level == 1:
+            # This is the level to evaluate at.
+            result = evaluate(rest[0], env)
+            if op == Symbol('unquote-splicing'):
+                if not isinstance(result, List):
+                    raise LogosEvaluationError("unquote-splicing must be used with a list.")
+                # Mark for splicing by the caller.
+                return [Symbol.SPLICE] + result
+            return result
+        else:
+            # Not our level, so reconstruct the form with a decremented level.
+            return [op] + [expand_quasiquote(rest[0], env, level - 1)]
+
+    # It's a regular list, so recurse through its items.
+    processed_list = []
+    for item in x:
+        result = expand_quasiquote(item, env, level)
+        # If the result is a list marked for splicing, flatten it into the current list.
+        if isinstance(result, List) and result and result[0] is Symbol.SPLICE:
+            processed_list.extend(result[1:])
+        else:
+            processed_list.append(result)
+    return processed_list
 
 
 def evaluate(x, env: Environment):
@@ -37,6 +78,10 @@ def evaluate(x, env: Environment):
         # (quote expression)
         return args[0]
 
+    elif op == 'quasiquote':
+        # (quasiquote expression)
+        return expand_quasiquote(args[0], env, level=1)
+
     elif op == 'if':
         # (if test conseq alt)
         if len(args) not in (2, 3):
@@ -61,7 +106,9 @@ def evaluate(x, env: Environment):
         # (defmacro name params . body)
         (name, params, *body) = args
         body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
-        env[name] = Macro(params, body_expr, env)
+        # A macro is a procedure that transforms ASTs, created here as a lambda.
+        macro_proc = evaluate([Symbol('lambda'), params, body_expr], env)
+        env.macros[name] = macro_proc
         return None
 
     elif op == 'set!':
@@ -152,7 +199,8 @@ def evaluate(x, env: Environment):
         with open(filepath) as f:
             source = f.read()
 
-        # Use parse_stream and evaluate each expression
+        # Use parse_stream and evaluate each expression in the file's scope
+        from .parser import parse_stream
         asts = parse_stream(source)
         result = None
         for ast in asts:
@@ -172,38 +220,21 @@ def evaluate(x, env: Environment):
         return hash_map
 
     else:
-        # Procedure call or Macro expansion
-        proc = evaluate(op, env)
-
-        if isinstance(proc, Macro):
-            # It's a macro. Expand it and evaluate the expansion.
-            macro_env = Environment(outer=proc.env)
-
-            # Bind macro parameters to unevaluated arguments
-            rest_param = None
-            fixed_params = proc.params
-            if Symbol('.') in proc.params:
-                dot_index = proc.params.index(Symbol('.'))
-                fixed_params = proc.params[:dot_index]
-                rest_param = proc.params[dot_index + 1]
-
-                if len(args) < len(fixed_params):
-                    raise LogosEvaluationError(f"Macro '{op}' expects at least {len(fixed_params)} arguments, got {len(args)}")
-                macro_env.update(zip(fixed_params, args))
-                macro_env[rest_param] = list(args[len(fixed_params):])
-            else:
-                if len(proc.params) != len(args):
-                    raise LogosEvaluationError(f"Macro '{op}' expects {len(proc.params)} arguments, got {len(args)}")
-                macro_env.update(zip(proc.params, args))
-
-            # Evaluate the macro body to get the expanded code, then evaluate the expanded code.
-            expanded_code = evaluate(proc.body, macro_env)
-            return evaluate(expanded_code, env)
-
-        elif not callable(proc):
-            raise LogosEvaluationError(f"'{op}' is not a procedure.")
+        # Check for macro expansion before procedure evaluation.
+        if isinstance(op, Symbol):
+            macro_env = env.find_macro(op)
+            if macro_env:
+                macro = macro_env.macros[op]
+                # It's a macro. Expand it by calling its proc with unevaluated args.
+                expanded_ast = macro(*args)
+                # Evaluate the result of the expansion.
+                return evaluate(expanded_ast, env)
 
         # It's a regular procedure call.
+        proc = evaluate(op, env)
+        if not callable(proc):
+            raise LogosEvaluationError(f"'{op}' is not a procedure.")
+
         evaluated_args = [evaluate(arg, env) for arg in args]
         try:
             return proc(*evaluated_args)

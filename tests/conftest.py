@@ -1,7 +1,7 @@
 import pytest
 from core.environment import create_global_env
 from core.interpreter import evaluate
-from core.parser import parse_stream
+from core.parser import parse
 from core.errors import LogosError
 
 @pytest.fixture(scope="function")
@@ -15,16 +15,11 @@ def global_env():
 
     # Load the kernel to make macros available for testing
     try:
-        with open("kernel.l0") as f:
-            kernel_source = f.read()
-
-        asts = parse_stream(kernel_source)
-        for ast in asts:
-            evaluate(ast, env)
+        # We use parse and evaluate on a 'load' expression, just like the REPL.
+        evaluate(parse('(load "kernel.l0")'), env)
 
     except FileNotFoundError:
-        # This allows tests to run even if the kernel is not yet created
-        print("\nWarning: kernel.l0 not found for testing. Some tests may fail.")
+        pytest.fail("FATAL: kernel.l0 not found during test setup. The kernel is required for tests to run.")
     except LogosError as e:
         pytest.fail(f"FATAL: Error loading kernel.l0 during test setup: {e}")
 

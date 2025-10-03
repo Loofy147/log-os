@@ -5,7 +5,8 @@ Defines the core data types used within the Log-Os interpreter.
 
 class Symbol(str):
     """A LISP-style symbol, which is a distinct type from a string."""
-    pass
+    # A unique object to mark lists that need to be spliced.
+    SPLICE = object()
 
 class Macro:
     """Represents a macro, holding its parameters and body."""
