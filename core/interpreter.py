@@ -5,7 +5,7 @@ AST (Abstract Syntax Tree) and an environment, and computes the result
 of the expression.
 """
 
-from .types import Symbol, List
+from .types import Symbol, List, Macro
 from .environment import Environment
 from .errors import LogosEvaluationError
 from .parser import parse
@@ -39,9 +39,17 @@ def evaluate(x, env: Environment):
 
     elif op == 'if':
         # (if test conseq alt)
-        (test, conseq, alt) = args
-        expr = (conseq if evaluate(test, env) else alt)
-        return evaluate(expr, env)
+        if len(args) not in (2, 3):
+            raise LogosEvaluationError(f"if form expects 2 or 3 arguments, but got {len(args)}")
+
+        test_expr = args[0]
+        conseq_expr = args[1]
+        alt_expr = args[2] if len(args) == 3 else None
+
+        if evaluate(test_expr, env):
+            return evaluate(conseq_expr, env)
+        else:
+            return evaluate(alt_expr, env) if alt_expr is not None else None
 
     elif op == 'defvar':
         # (defvar symbol expr)
@@ -56,15 +64,58 @@ def evaluate(x, env: Environment):
         return env.find(symbol)[symbol]
 
     elif op == 'lambda':
-        # (lambda (params...) body)
-        (params, body) = args
-        return lambda *arguments: evaluate(body, Environment(params, arguments, env))
+        # (lambda (params... [. rest]) body...)
+        (params, *body) = args
+        if not body:
+            raise LogosEvaluationError("lambda form must have a body.")
+
+        body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
+
+        # Handle variadic parameters
+        rest_param = None
+        fixed_params = params
+        if Symbol('.') in params:
+            dot_index = params.index(Symbol('.'))
+            if dot_index != len(params) - 2:
+                raise LogosEvaluationError("Syntax error: '.' in parameter list must be the second-to-last element.")
+
+            fixed_params = params[:dot_index]
+            rest_param = params[dot_index + 1]
+
+        def lambda_func(*arguments):
+            local_env = Environment(outer=env)
+            if rest_param: # If it's a variadic function
+                if len(arguments) < len(fixed_params):
+                    raise LogosEvaluationError(f"Procedure expects at least {len(fixed_params)} arguments, got {len(arguments)}")
+                local_env.update(zip(fixed_params, arguments))
+                local_env[rest_param] = list(arguments[len(fixed_params):])
+            else: # If it's a fixed-arity function
+                if len(fixed_params) != len(arguments):
+                    raise LogosEvaluationError(f"Procedure expects {len(fixed_params)} arguments, got {len(arguments)}")
+                local_env.update(zip(fixed_params, arguments))
+
+            return evaluate(body_expr, local_env)
+
+        return lambda_func
 
     elif op == 'defun':
-        # (defun name (params...) body) -- syntactic sugar for (defvar name (lambda ...))
-        (name, params, body) = args
-        env[name] = evaluate(['lambda', params, body], env)
+        # (defun name (params...) [docstring] body)
+        (name, params, *body) = args
+        # A docstring is a string literal, but not a Symbol
+        if isinstance(body[0], str) and not isinstance(body[0], Symbol):
+            body = body[1:]
+
+        body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
+        env[name] = evaluate(['lambda', params, body_expr], env)
         return env[name]
+
+    elif op == 'begin':
+        # (begin expr1 expr2 ...)
+        # Evaluates expressions sequentially and returns the last one.
+        result = None
+        for expr in args:
+            result = evaluate(expr, env)
+        return result
 
     elif op == 'and':
         # (and expr1 expr2 ...) - short-circuiting
@@ -83,15 +134,6 @@ def evaluate(x, env: Environment):
             if val:
                 return True
         return val
-
-    elif op == 'while':
-        # (while condition body...)
-        (condition, *body) = args
-        last_val = None
-        while evaluate(condition, env):
-            for expr in body:
-                last_val = evaluate(expr, env)
-        return last_val
 
     elif op == 'let':
         # (let ((var val) ...) body...)
@@ -119,16 +161,9 @@ def evaluate(x, env: Environment):
         with open(filepath) as f:
             source = f.read()
 
-        # The new parser returns a list of expressions
-        expressions = parse(source)
-
-        # Evaluate each expression in the file
-        result = None
-        for expr in expressions:
-            result = evaluate(expr, env)
-
-        # Return the result of the last evaluated expression
-        return result
+        # Wrap the file content in a 'begin' block to handle multiple expressions
+        ast = parse(f"(begin {source})")
+        return evaluate(ast, env)
 
     elif op == 'hash-map':
         # (hash-map key1 val1 key2 val2 ...)

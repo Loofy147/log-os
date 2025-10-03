@@ -28,7 +28,7 @@ The current version is a surprisingly capable LISP dialect with a rich set of pr
 
 1.  **Clone the repository:**
     ```bash
-    git clone https://github.com/your-username/log-os.git
+    git clone https://github.com/username/log-os.git
     cd log-os
     ```
 

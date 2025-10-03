@@ -10,6 +10,7 @@ import functools
 import os
 
 from .types import Symbol, List, Atom
+from .errors import LogosEvaluationError, LogosAssertionError
 
 class Environment(dict):
     """A dictionary with an outer scope."""
@@ -44,12 +45,16 @@ def create_global_env() -> Environment:
         Symbol('>='): op.ge,
         Symbol('<='): op.le,
         Symbol('='): op.eq,
+        Symbol('%'): op.mod,
 
         # Core functions
+        Symbol('error'): lambda message: (_ for _ in ()).throw(LogosEvaluationError(message)),
+        Symbol('assert-equal'): lambda actual, expected: (
+            True if actual == expected
+            else (_ for _ in ()).throw(LogosAssertionError(f"Assertion Failed: Expected {expected}, but got {actual}"))
+        ),
         Symbol('abs'): abs,
-        Symbol('append'): op.add,
         Symbol('apply'): lambda proc, args: proc(*args),
-        Symbol('begin'): lambda *x: x[-1],
         Symbol('car'): lambda x: x[0],
         Symbol('cdr'): lambda x: x[1:],
         Symbol('cons'): lambda x, y: [x] + y,
@@ -92,4 +97,5 @@ def create_global_env() -> Environment:
             result.extend(lst)
         return result
     env[Symbol('append')] = variadic_append
+
     return env
