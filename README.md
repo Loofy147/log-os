@@ -2,20 +2,27 @@
 
 Log-Os is an experimental programming language and environment built on the principle of **reflection** and **bootstrapping**. The ultimate goal is to create an intelligent system that can understand, analyze, and rewrite its own code to evolve and improve.
 
-This repository contains the initial seed, `Logos-0`, a minimal LISP-like interpreter written in Python, designed to be just powerful enough to start the self-improvement loop.
+This repository contains `Logos-0`, a powerful LISP-like interpreter written in Python, designed to be the foundation for a self-aware software system.
 
 ## Vision
 
 The long-term vision for Log-Os is to evolve it into a hybrid probabilistic, causal modeling language that integrates concepts from category theory, the free energy principle, and algebraic topology to reason about and build complex software systems.
 
-## Logos-0: The Seed
+## Logos-0: The Core Interpreter
 
-The initial version is a simple interpreter for an S-expression based language. Its core feature is **homoiconicity**: the code is represented by the language's own data structures (nested lists), making metaprogramming trivial.
+The current version is a surprisingly capable LISP dialect with a rich set of primitive operations. Its core feature is **homoiconicity**: the code is represented by the language's own data structures (nested lists), making metaprogramming trivial.
 
 ### Core Features
-- LISP-like syntax (S-expressions).
-- A simple, recursive `evaluate` interpreter written in Python.
-- Reflective capabilities: `(read-source)` and `(write-source)` to allow a Log-Os program to manipulate its own source code.
+- **LISP-like Syntax:** S-expressions provide a simple, uniform structure for code and data.
+- **Rich Primitives:** A robust set of built-in functions and special forms, including:
+  - **Control Flow:** `if`, `and`, `or`, `while`.
+  - **Variable Bindings:** `defvar` (global), `set!` (mutation), `let` (local).
+  - **Data Structures:** Lists, Symbols, Strings, Numbers, and a full `hash-map` type.
+  - **Metaprogramming:** `quote`, `eval` (implicitly via interpreter).
+- **Reflective Capabilities:** The interpreter can interact with its own environment:
+  - `(load "filepath")` provides a simple module system.
+  - `(read-source "filepath")` parses a source file into an AST.
+  - `(list-directory "path")` inspects the filesystem.
 
 ## Getting Started
 
@@ -37,17 +44,22 @@ The initial version is a simple interpreter for an S-expression based language. 
     pytest
     ```
 
+4.  **Start the REPL:**
+    ```bash
+    python repl.py
+    ```
+
 ## The Bootstrapping Plan
 
-1.  **Phase 0 (Current):** Build a stable `Logos-0` interpreter in Python.
-2.  **Phase 1:** Use `Logos-0` to write simple refactoring and analysis tools for its own code (e.g., `bootstrap/refactor.l0`).
-3.  **Phase 2:** Use these tools to help design and implement a static type system for the next version, `Logos-1`.
-4.  **Phase 3 and beyond:** Continue this evolutionary cycle, adding features like probabilistic types, a JIT compiler, and eventually rewriting the interpreter itself in Log-Os.
+The core interpreter is now stable and feature-rich. The next phase focuses on using these capabilities to build sophisticated analysis tools in Log-Os itself.
+
+1.  **Phase 0 (Complete):** Build a stable and powerful `Logos-0` interpreter in Python.
+2.  **Phase 1 (Current):** Use `Logos-0` to write a suite of static analysis tools for Log-Os code. This will involve creating a standard library (`stdlib/`) for analysis, starting with tools that can build a full call graph of a project.
+3.  **Phase 2 and beyond:** Use these analysis tools to enable the system to reason about its own structure, complexity, and behavior, paving the way for automated refactoring, optimization, and eventually, self-compilation.
 
 ## Project Structure
 
 -   `/core`: The Python source code for the `Logos-0` interpreter.
--   `/bootstrap`: The first Log-Os (`.l0`) programs designed to analyze and modify the system.
 -   `/tests`: Unit tests for the Python core.
 
 ---

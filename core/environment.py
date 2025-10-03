@@ -79,5 +79,17 @@ def create_global_env() -> Environment:
         # Hash-map functions
         Symbol('hash-get'): lambda h_map, key: h_map.get(key),
         Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
+
+        # Utility functions
+        Symbol('member?'): lambda item, lst: item in lst,
+        Symbol('filter'): lambda pred, lst: list(filter(pred, lst)),
+        Symbol('ends-with?'): lambda s, suffix: s.endswith(suffix),
     })
+    # 'append' needs to be variadic, so we define it separately.
+    def variadic_append(*lists):
+        result = []
+        for lst in lists:
+            result.extend(lst)
+        return result
+    env[Symbol('append')] = variadic_append
     return env

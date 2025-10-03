@@ -10,62 +10,63 @@ from .types import Symbol
 
 def parse(source_code: str):
     """
-    Parses a string containing Log-Os S-expressions into a Python list.
-    Example: "(add 1 (mul 2 3))" -> ['add', 1, ['mul', 2, 3]]
+    Parses a string of Log-Os source code into a list of expressions.
     """
-    # 1. Remove comments (anything after a semicolon)
+    # 1. Remove comments
     source_code = '\n'.join(line.split(';', 1)[0] for line in source_code.splitlines())
 
-    # 2. Add spaces around parentheses and quotes for easier tokenization
+    # 2. Tokenize
     source_code = source_code.replace('(', ' ( ').replace(')', ' ) ').replace("'", " ' ")
     tokens = source_code.split()
-    if not tokens:
-        # This can happen if the source is only comments
-        return []
 
-    # 2. Read tokens recursively
-    ast, _ = read_from_tokens(tokens)
-    return ast
+    # 3. Read all expressions from the token stream
+    expressions = []
+    while tokens:
+        expressions.append(read_from_tokens(tokens))
+
+    return expressions
 
 def read_from_tokens(tokens: list):
-    """Recursively reads tokens to build the nested list structure."""
-    if len(tokens) == 0:
-        raise LogosSyntaxError("Unexpected EOF while reading.")
+    """
+    Recursively reads an expression from a list of tokens.
+    This is a robust, purely recursive implementation.
+    """
+    if not tokens:
+        raise LogosSyntaxError("Unexpected EOF while reading tokens.")
 
     token = tokens.pop(0)
+
     if token == "'":
-        return [Symbol('quote'), read_from_tokens(tokens)[0]], 2
+        return [Symbol('quote'), read_from_tokens(tokens)]
     elif token == '(':
-        nested_list = []
-        while tokens and tokens[0] != ')':
-            sub_ast, _ = read_from_tokens(tokens)
-            nested_list.append(sub_ast)
-
-        if not tokens:
-            raise LogosSyntaxError("Unexpected EOF: missing ')'")
-
-        tokens.pop(0)  # Pop off ')'
-        return nested_list, len(nested_list)
+        L = []
+        while tokens[0] != ')':
+            L.append(read_from_tokens(tokens))
+            if not tokens:
+                raise LogosSyntaxError("Unexpected EOF: missing ')'")
+        tokens.pop(0)  # Pop off the closing ')'
+        return L
     elif token == ')':
-        raise LogosSyntaxError("Unexpected ')'")
+        raise LogosSyntaxError("Unexpected ')' encountered.")
     else:
-        return atom(token), 1
+        return atom(token)
 
 def atom(token: str):
     """
     Converts a token to its appropriate Python type.
-    Handles integers, floats, booleans (#t/#f), strings, and Symbols.
+    Handles strings, booleans, integers, floats, and Symbols.
     """
     if token.startswith('"') and token.endswith('"'):
-        return token[1:-1]  # Return as a string literal
-    if token == '#t':
+        return token[1:-1]
+    elif token == '#t':
         return True
-    if token == '#f':
+    elif token == '#f':
         return False
-    try:
-        return int(token)
-    except ValueError:
+    else:
         try:
-            return float(token)
+            return int(token)
         except ValueError:
-            return Symbol(token)  # Return as a Symbol
+            try:
+                return float(token)
+            except ValueError:
+                return Symbol(token)
