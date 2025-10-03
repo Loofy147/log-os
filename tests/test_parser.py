@@ -20,6 +20,11 @@ def test_parse_with_floats():
     expected_ast = [Symbol('+'), 1.5, 2.5]
     assert parse(source) == expected_ast
 
+def test_parse_booleans():
+    source = "(if #t #f #t)"
+    expected_ast = [Symbol('if'), True, False, True]
+    assert parse(source) == expected_ast
+
 def test_parse_empty_list():
     source = "()"
     expected_ast = []

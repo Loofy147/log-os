@@ -1,0 +1,10 @@
+;; A sample file for testing the analyzer.
+(defun my-func-1 (x)
+  (+ x 1))
+
+(defun my-func-2 (y z)
+  (* y z))
+
+;; Not a defun
+(let ((a 10))
+  a)

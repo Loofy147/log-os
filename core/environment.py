@@ -6,6 +6,7 @@ This environment contains built-in procedures and standard library functions.
 
 import math
 import operator as op
+import functools
 
 from .types import Symbol, List, Atom
 
@@ -25,49 +26,52 @@ class Environment(dict):
         else:
             raise NameError(f"Symbol '{var}' is not defined.")
 
+from .parser import parse
+from .utils import lisp_str
+
 def create_global_env() -> Environment:
     """Creates and returns the default global environment."""
     env = Environment()
     env.update({
         # Mathematical operators
-        '+': op.add,
-        '-': op.sub,
-        '*': op.mul,
-        '/': op.truediv,
-        '>': op.gt,
-        '<': op.lt,
-        '>=': op.ge,
-        '<=': op.le,
-        '=': op.eq,
+        Symbol('+'): lambda *args: sum(args),
+        Symbol('-'): op.sub,
+        Symbol('*'): lambda *args: functools.reduce(op.mul, args, 1),
+        Symbol('/'): op.truediv,
+        Symbol('>'): op.gt,
+        Symbol('<'): op.lt,
+        Symbol('>='): op.ge,
+        Symbol('<='): op.le,
+        Symbol('='): op.eq,
 
         # Core functions
-        'abs': abs,
-        'append': op.add,
-        'apply': lambda proc, args: proc(*args),
-        'begin': lambda *x: x[-1],
-        'car': lambda x: x[0],
-        'cdr': lambda x: x[1:],
-        'cons': lambda x, y: [x] + y,
-        'eq?': op.is_,
-        'equal?': op.eq,
-        'length': len,
-        'list': lambda *x: list(x),
-        'list?': lambda x: isinstance(x, list),
-        'map': lambda proc, lst: list(map(proc, lst)),
-        'max': max,
-        'min': min,
-        'not': op.not_,
-        'null?': lambda x: x == [],
-        'number?': lambda x: isinstance(x, (int, float)),
-        'procedure?': callable,
-        'round': round,
-        'symbol?': lambda x: isinstance(x, Symbol),
+        Symbol('abs'): abs,
+        Symbol('append'): op.add,
+        Symbol('apply'): lambda proc, args: proc(*args),
+        Symbol('begin'): lambda *x: x[-1],
+        Symbol('car'): lambda x: x[0],
+        Symbol('cdr'): lambda x: x[1:],
+        Symbol('cons'): lambda x, y: [x] + y,
+        Symbol('eq?'): op.is_,
+        Symbol('equal?'): op.eq,
+        Symbol('length'): len,
+        Symbol('list'): lambda *x: list(x),
+        Symbol('list?'): lambda x: isinstance(x, list),
+        Symbol('map'): lambda proc, lst: list(map(proc, lst)),
+        Symbol('max'): max,
+        Symbol('min'): min,
+        Symbol('not'): op.not_,
+        Symbol('null?'): lambda x: x == [],
+        Symbol('number?'): lambda x: isinstance(x, (int, float)),
+        Symbol('procedure?'): callable,
+        Symbol('round'): round,
+        Symbol('symbol?'): lambda x: isinstance(x, Symbol),
 
         # Math constants
-        'pi': math.pi,
+        Symbol('pi'): math.pi,
 
-        # Reflective functions (placeholders for now)
-        'read-source': lambda f: print(f"Reading from {f}... Not implemented."),
-        'write-source': lambda f, d: print(f"Writing to {f}... Not implemented."),
+        # Reflective I/O
+        Symbol('read-source'): lambda filepath: parse(f"(begin {open(filepath).read()})"),
+        Symbol('write-source'): lambda filepath, data: open(filepath, 'w').write(lisp_str(data)),
     })
     return env

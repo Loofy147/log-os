@@ -64,6 +64,15 @@ def evaluate(x, env: Environment):
         env[name] = evaluate(['lambda', params, body], env)
         return env[name]
 
+    elif op == 'let':
+        # (let ((var val) ...) body) => ((lambda (vars...) body) vals...)
+        (bindings, body) = args
+        params = [b[0] for b in bindings]
+        values = [b[1] for b in bindings]
+        lambda_expr = ['lambda', params, body]
+        eval_expr = [lambda_expr] + values
+        return evaluate(eval_expr, env)
+
     else:
         # Procedure call
         proc = evaluate(op, env)
