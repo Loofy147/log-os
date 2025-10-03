@@ -1,0 +1,22 @@
+;; bootstrap/analyzer.l0
+;; A simple Log-Os program to analyze Log-Os source code.
+
+(defun is-defun-form (ast)
+  ;; Checks if an AST node is a (defun ...) form.
+  (if (list? ast)
+      (if (not (null? ast))
+          (equal? (car ast) 'defun)
+          #f)
+      #f))
+
+(defun count-defuns-in-ast (ast)
+  ;; Recursively counts defun forms in an AST.
+  (if (list? ast)
+      (+ (if (is-defun-form ast) 1 0)
+         (apply + (map count-defuns-in-ast (cdr ast))))
+      0))
+
+(defun analyze-file (filepath)
+  ;; Reads a source file and counts the number of 'defun' forms.
+  (let ((source-ast (read-source filepath)))
+    (count-defuns-in-ast source-ast)))

@@ -4,6 +4,7 @@ from core.parser import parse
 from core.interpreter import evaluate
 from core.environment import create_global_env
 from core.errors import LogosError
+from core.utils import lisp_str
 
 def main():
     """Starts the Read-Eval-Print Loop for Log-Os."""
@@ -30,13 +31,6 @@ def main():
             break
         except Exception as e:
             print(f"An unexpected Python error occurred: {e}", file=sys.stderr)
-
-def lisp_str(exp):
-    """Converts a Python object back into a LISP-readable string."""
-    if isinstance(exp, list):
-        return '(' + ' '.join(map(lisp_str, exp)) + ')'
-    else:
-        return str(exp)
 
 if __name__ == "__main__":
     main()

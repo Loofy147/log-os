@@ -13,11 +13,15 @@ def parse(source_code: str):
     Parses a string containing Log-Os S-expressions into a Python list.
     Example: "(add 1 (mul 2 3))" -> ['add', 1, ['mul', 2, 3]]
     """
-    # 1. Add spaces around parentheses for easier tokenization
-    source_code = source_code.replace('(', ' ( ').replace(')', ' ) ')
+    # 1. Remove comments (anything after a semicolon)
+    source_code = '\n'.join(line.split(';', 1)[0] for line in source_code.splitlines())
+
+    # 2. Add spaces around parentheses and quotes for easier tokenization
+    source_code = source_code.replace('(', ' ( ').replace(')', ' ) ').replace("'", " ' ")
     tokens = source_code.split()
     if not tokens:
-        raise LogosSyntaxError("Source code is empty.")
+        # This can happen if the source is only comments
+        return []
 
     # 2. Read tokens recursively
     ast, _ = read_from_tokens(tokens)
@@ -29,7 +33,9 @@ def read_from_tokens(tokens: list):
         raise LogosSyntaxError("Unexpected EOF while reading.")
 
     token = tokens.pop(0)
-    if token == '(':
+    if token == "'":
+        return [Symbol('quote'), read_from_tokens(tokens)[0]], 2
+    elif token == '(':
         nested_list = []
         while tokens and tokens[0] != ')':
             sub_ast, _ = read_from_tokens(tokens)
@@ -46,11 +52,20 @@ def read_from_tokens(tokens: list):
         return atom(token), 1
 
 def atom(token: str):
-    """Converts a token to its appropriate Python type (int, float, or Symbol)."""
+    """
+    Converts a token to its appropriate Python type.
+    Handles integers, floats, booleans (#t/#f), strings, and Symbols.
+    """
+    if token.startswith('"') and token.endswith('"'):
+        return token[1:-1]  # Return as a string literal
+    if token == '#t':
+        return True
+    if token == '#f':
+        return False
     try:
         return int(token)
     except ValueError:
         try:
             return float(token)
         except ValueError:
-            return Symbol(token)
+            return Symbol(token)  # Return as a Symbol
