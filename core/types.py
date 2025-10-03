@@ -7,6 +7,13 @@ class Symbol(str):
     """A LISP-style symbol, which is a distinct type from a string."""
     pass
 
+class Macro:
+    """Represents a macro, holding its parameters and body."""
+    def __init__(self, params, body, env):
+        self.params = params
+        self.body = body
+        self.env = env # The environment where the macro was defined
+
 # An Atom is a Symbol, a number, a boolean, a string, or a hash-map.
 Atom = (Symbol, int, float, str, bool, dict)
 

@@ -14,3 +14,7 @@ class LogosSyntaxError(LogosError):
 class LogosEvaluationError(LogosError):
     """Raised for errors during code evaluation."""
     pass
+
+class LogosAssertionError(LogosError):
+    """Raised for failed assertions."""
+    pass
