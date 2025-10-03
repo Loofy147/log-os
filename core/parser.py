@@ -14,7 +14,8 @@ def tokenize(source_code: str) -> list:
     Splits the source code into a list of tokens using a robust regex.
     """
     source_code = '\n'.join(line.split(';', 1)[0] for line in source_code.splitlines())
-    token_regex = r'"[^"]*"|\'|\(|\)|#t|#f|[^\s\(\)]+'
+    # The regex now includes support for `,@`, ` ` `, and `,`
+    token_regex = r',@|"[^"]*"|\'|`|,|\(|\)|#t|#f|[^\s\(\)]+'
     return re.findall(token_regex, source_code)
 
 def parse(source_code: str):
@@ -41,6 +42,12 @@ def read_from_tokens(tokens: list):
 
     if token == "'":
         return [Symbol('quote'), read_from_tokens(tokens)]
+    elif token == '`':
+        return [Symbol('quasiquote'), read_from_tokens(tokens)]
+    elif token == ',':
+        return [Symbol('unquote'), read_from_tokens(tokens)]
+    elif token == ',@':
+        return [Symbol('unquote-splicing'), read_from_tokens(tokens)]
     elif token == '(':
         L = []
         while tokens and tokens[0] != ')':
@@ -55,6 +62,21 @@ def read_from_tokens(tokens: list):
         raise LogosSyntaxError("Unexpected ')' encountered.")
     else:
         return atom(token)
+
+def parse_stream(source_code: str) -> list:
+    """
+    Parses a string of Log-Os source code containing multiple expressions
+    into a list of ASTs.
+    """
+    tokens = tokenize(source_code)
+    if not tokens:
+        return []
+
+    asts = []
+    while tokens:
+        asts.append(read_from_tokens(tokens))
+    return asts
+
 
 def atom(token: str):
     """

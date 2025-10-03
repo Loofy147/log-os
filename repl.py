@@ -9,6 +9,17 @@ from core.utils import lisp_str
 def main():
     """Starts the Read-Eval-Print Loop for Log-Os."""
     global_env = create_global_env()
+
+    # Load the kernel to bootstrap the language with self-hosted macros
+    try:
+        evaluate(parse('(load "kernel.l0")'), global_env)
+        print("Kernel loaded successfully.")
+    except FileNotFoundError:
+        print("Warning: kernel.l0 not found. Language will be in minimal mode.")
+    except LogosError as e:
+        print(f"FATAL: Error loading kernel.l0: {e}")
+        return
+
     print("Log-Os 0.0.1 REPL")
     print("Press Ctrl+C to exit.")
 

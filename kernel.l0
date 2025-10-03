@@ -1,0 +1,26 @@
+;; kernel.l0
+;; The self-hosted heart of the Log-Os language.
+;; Core forms are redefined here as macros.
+
+(defmacro unless (condition . body)
+  "Executes body if condition is false."
+  `(if (not ,condition)
+       (begin ,@body)))
+
+(defmacro let (bindings . body)
+  "Binds variables locally. e.g., (let ((x 1)) (+ x 1))"
+  `((lambda ,(map car bindings) ,@body)
+    ,@(map (lambda (b) (car (cdr b))) bindings)))
+
+(defmacro cond (. clauses)
+  "Evaluates clauses until a predicate is true."
+  (if (> (length clauses) 0)
+      `(if ,(caar clauses)
+           (begin ,@(cdar clauses))
+           (cond ,@(cdr clauses)))
+      #f))
+
+;; A simple assertion macro for internal tests
+(defmacro assert (expression)
+  `(unless ,expression
+     (error "Assertion failed")))

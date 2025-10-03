@@ -13,11 +13,13 @@ from .types import Symbol, List, Atom
 from .errors import LogosEvaluationError, LogosAssertionError
 
 class Environment(dict):
-    """A dictionary with an outer scope."""
+    """A dictionary with an outer scope and a separate space for macros."""
     def __init__(self, params=(), args=(), outer=None):
         super().__init__()
         self.update(zip(params, args))
         self.outer = outer
+        # Macros are stored separately to prevent them from being called as functions.
+        self.macros = {}
 
     def find(self, var: Symbol) -> 'Environment':
         """Finds the innermost environment where a variable is defined."""
@@ -27,6 +29,15 @@ class Environment(dict):
             return self.outer.find(var)
         else:
             raise NameError(f"Symbol '{var}' is not defined.")
+
+    def find_macro(self, var: Symbol) -> 'Environment':
+        """Finds the innermost environment where a macro is defined."""
+        if var in self.macros:
+            return self
+        elif self.outer is not None:
+            return self.outer.find_macro(var)
+        else:
+            return None # Return None if macro is not found, not an error
 
 from .parser import parse
 from .utils import lisp_str
