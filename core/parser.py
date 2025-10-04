@@ -11,11 +11,13 @@ from .types import Symbol
 
 def tokenize(source_code: str) -> list:
     """
-    Splits the source code into a list of tokens using a robust regex.
+    Splits the source code into a list of tokens using a robust regex
+    that correctly handles escaped characters within strings.
     """
     source_code = '\n'.join(line.split(';', 1)[0] for line in source_code.splitlines())
-    # The regex now includes support for `,@`, ` ` `, and `,`
-    token_regex = r',@|"[^"]*"|\'|`|,|\(|\)|#t|#f|[^\s\(\)]+'
+    # The regex for strings `"(?:\\.|[^"\\])*"` handles escaped quotes,
+    # preventing the tokenizer from splitting strings containing special characters.
+    token_regex = r',@|"(?:\\.|[^"\\])*"|\'|`|,|\(|\)|#t|#f|[^\s\(\)]+'
     return re.findall(token_regex, source_code)
 
 def parse(source_code: str):

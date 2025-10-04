@@ -1,0 +1,12 @@
+;; stdlib/contracts.l0
+;; A simple contract system for Log-Os.
+
+(defmacro defun/c (name contract-map params . body)
+  "Defines a function with a contract map.
+   For now, it primarily handles a :doc string, but is designed for extension.
+   Example: (defun/c my-fn (hash-map 'doc \"My Docs\") (x) (+ x 1))"
+  ;; Macros operate on syntax (ASTs), not evaluated objects.
+  ;; This implementation manually extracts the docstring from the contract-map AST.
+  ;; It assumes the structure is (hash-map 'doc "some-string").
+  (let ((doc (car (cdr (cdr contract-map))))) ;; (caddr contract-map)
+    `(defun ,name ,params ,doc ,@body)))

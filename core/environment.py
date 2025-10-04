@@ -128,6 +128,7 @@ def create_global_env(eval_func) -> Environment:
         # Hash-map functions
         Symbol('hash-get'): lambda h_map, key, default=None: h_map.get(key, default),
         Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
+        Symbol('hash-count'): len,
         # --- NEW: Needed for Cost Model ---
         Symbol('hash-contains?'): lambda d, k: k in d,
 
@@ -160,6 +161,16 @@ def create_global_env(eval_func) -> Environment:
         Symbol('sleep'): time.sleep,
         Symbol('string-append'): lambda *args: "".join(map(str, args)),
         Symbol('lisp-str'): lisp_str,
+        Symbol('type-of'): lambda x: (
+            Symbol('string') if isinstance(x, str) else
+            Symbol('boolean') if isinstance(x, bool) else # bool must be checked before number
+            Symbol('number') if isinstance(x, (int, float)) else
+            Symbol('list') if isinstance(x, list) else
+            Symbol('symbol') if isinstance(x, Symbol) else
+            Symbol('procedure') if callable(x) else
+            Symbol('hash-map') if isinstance(x, dict) else
+            Symbol('null')
+        ),
     })
     # 'append' needs to be variadic, so we define it separately.
     def variadic_append(*lists):

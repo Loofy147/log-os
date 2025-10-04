@@ -22,8 +22,8 @@ def test_setup_teardown():
 @pytest.fixture
 def lisp_eval_env():
     """
-    Provides a LISP evaluation function and its corresponding environment.
-    The environment is pre-loaded with kernel.l0 and all the Synapse libraries.
+    Provides a LISP evaluation function and its corresponding environment,
+    with kernel.l0 pre-loaded.
     """
     env = create_global_env(evaluate)
 
@@ -31,15 +31,72 @@ def lisp_eval_env():
     def evaluator(ast):
         return evaluate(ast, env)
 
-    # Load kernel and all necessary Synapse project files
-    for filepath in ["kernel.l0", "stdlib/telemetry.l0", "stdlib/cost-model.l0", "stdlib/tuning.l0", "core/lisp/aware-evaluator.l0"]:
-        with open(filepath, 'r') as f:
-            source = f.read()
-            asts = parse_stream(source)
-            for ast in asts:
-                evaluator(ast)
+    # Load kernel, which is foundational for almost all LISP code.
+    with open("kernel.l0", 'r') as f:
+        source = f.read()
+        asts = parse_stream(source)
+        for ast in asts:
+            evaluator(ast)
 
     return evaluator, env
+
+def run_lisp_file(lisp_eval, filepath: str):
+    """Helper function to load and evaluate a LISP file."""
+    ast = parse(f'(load "{filepath}")')
+    lisp_eval(ast)
+
+def test_contracts_l0(lisp_eval_env):
+    """Tests the contracts system by running the LISP test suite."""
+    lisp_eval, env = lisp_eval_env
+    run_lisp_file(lisp_eval, "tests/test_contracts.l0")
+
+def test_multimethods_l0_success(lisp_eval_env):
+    """Tests the multimethod system's success cases by running the LISP test file."""
+    lisp_eval, env = lisp_eval_env
+    run_lisp_file(lisp_eval, "tests/test_multimethods.l0")
+
+def test_multimethods_l0_error_on_no_method(lisp_eval_env):
+    """
+    Tests that the multimethod dispatcher returns a special symbol
+    when no method is found (workaround for interpreter bug).
+    """
+    lisp_eval, env = lisp_eval_env
+
+    # Load the multimethods library and the test file which defines the 'report-type' multimethod.
+    run_lisp_file(lisp_eval, "stdlib/multimethods.l0")
+    run_lisp_file(lisp_eval, "tests/test_multimethods.l0")
+
+    # Call 'report-type' with a boolean (for which no method is defined).
+    result = lisp_eval(parse("(report-type #f)"))
+
+    # Assert that the result is the special error symbol.
+    assert result == Symbol('*%no-method-found%*')
+
+def test_stdlib_l0(lisp_eval_env):
+    """
+    Tests the standard library's 'count' generic function by directly
+    loading dependencies and calling the function from Python.
+    """
+    lisp_eval, env = lisp_eval_env
+
+    # Load the new systems one by one to isolate any syntax errors.
+    run_lisp_file(lisp_eval, "stdlib/contracts.l0")
+    run_lisp_file(lisp_eval, "stdlib/multimethods.l0")
+    # This is the file that defines 'count'.
+    run_lisp_file(lisp_eval, "stdlib/collections.l0")
+
+    # Get a handle to the LISP 'count' function.
+    count_fn = lisp_eval(Symbol('count'))
+
+    # Test 'count' with a list.
+    assert count_fn([1, 2, 3]) == 3
+    assert count_fn([]) == 0
+
+    # Test 'count' with a hash-map.
+    # Note: We need to use Symbol for keys if they are symbols in LISP.
+    test_map = {Symbol('a'): 1, Symbol('b'): 2}
+    assert count_fn(test_map) == 2
+    assert count_fn({}) == 0
 
 def test_synapse_adaptive_behavior_directly(lisp_eval_env):
     """
@@ -47,6 +104,10 @@ def test_synapse_adaptive_behavior_directly(lisp_eval_env):
     This bypasses complex LISP script execution, targeting the core logic instead.
     """
     lisp_eval, env = lisp_eval_env
+
+    # Load Synapse-specific libraries
+    for filepath in ["stdlib/telemetry.l0", "stdlib/cost-model.l0", "stdlib/tuning.l0", "core/lisp/aware-evaluator.l0"]:
+         run_lisp_file(lisp_eval, filepath)
 
     # 1. --- Get handles to the LISP functions we need to call ---
     compose_evaluator_fn = lisp_eval(Symbol('compose-aware-evaluator'))
