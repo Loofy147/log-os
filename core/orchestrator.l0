@@ -1,0 +1,41 @@
+
+;; core/orchestrator.l0
+;; Thompson Sampling based Meta-Orchestrator in Log-Os L0 syntax
+;; Assumes existence of random-beta (alpha,beta) and ability to call evaluator functions by name.
+
+(defn make-orch [agents]
+  ;; agents: list of agent names as symbols or strings
+  ;; returns orchestrator state: map agent -> {:alpha 1 :beta 1 :stats []}
+  (reduce (fn [m a] (assoc m a {:alpha 1 :beta 1 :trials 0 :wins 0})) {} agents))
+
+(defn sample-agent [orch]
+  ;; draw a beta sample per agent, return best agent name
+  (let [draws (map (fn [[k v]]
+                     [k (random-beta (get v :alpha) (get v :beta))]) orch)
+        sorted (sort-by second > draws)]
+    (first (first sorted))))
+
+(defn update-orch [orch agent result-threshold time-ms]
+  ;; result-threshold: numeric latency threshold; if time-ms <= threshold -> success
+  (let [entry (get orch agent)
+        succ (if (<= time-ms result-threshold) 1 0)
+        new (-> entry
+                (update :trials + 1)
+                (update :wins + succ)
+                (update :alpha + succ)
+                (update :beta + (- 1 succ))
+                (update :stats conj time-ms))]
+    (assoc orch agent new)))
+
+(defn orchestrate-run [orch ast env threshold]
+  ;; choose agent, run, measure, update and return {:agent .. :time .. :orch .. :result ..}
+  (let [agent (sample-agent orch)
+        ;; dispatch to evaluator
+        res (case agent
+              "eval-with-caching" (eval-with-caching ast env (cache-key ast env))
+              "eval-jit-sim" (eval-jit-sim ast env {})
+              "eval-baseline" (eval-baseline ast env))
+        t (:time-ms res)
+        new-orch (update-orch orch agent t threshold)]
+
+    {:agent agent :time t :result res :orch new-orch}))

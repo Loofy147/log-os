@@ -11,7 +11,9 @@ def global_env():
     This fixture ensures that macros like 'let' and 'cond' are available
     for tests that need them.
     """
-    env = create_global_env()
+    # The 'evaluate' function is now passed to create the environment
+    # to break a circular dependency.
+    env = create_global_env(evaluate)
 
     # Load the kernel to make macros available for testing
     try:

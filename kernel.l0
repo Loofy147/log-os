@@ -24,3 +24,7 @@
 (defmacro assert (expression)
   `(unless ,expression
      (error "Assertion failed")))
+
+(defmacro defn (name params . body)
+  "A convenience macro for defining a named function."
+  `(defun ,name ,params ,@body))
