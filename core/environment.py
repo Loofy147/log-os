@@ -8,21 +8,38 @@ import math
 import operator as op
 import functools
 import os
+import time
 
 from .types import Symbol, List, Atom
 from .errors import LogosEvaluationError, LogosAssertionError
+
+from .types import Procedure
 
 class Environment(dict):
     """A dictionary with an outer scope and a separate space for macros."""
     def __init__(self, params=(), args=(), outer=None):
         super().__init__()
-        self.update(zip(params, args))
+        # Handle variadic parameters
+        if Symbol('.') in params:
+            dot_index = params.index(Symbol('.'))
+            fixed_params = params[:dot_index]
+            rest_param = params[dot_index + 1]
+
+            if len(args) < len(fixed_params):
+                raise LogosEvaluationError(f"Procedure expects at least {len(fixed_params)} arguments, got {len(args)}")
+
+            self.update(zip(fixed_params, args))
+            self[rest_param] = list(args[len(fixed_params):])
+        else:
+            if len(params) != len(args):
+                raise LogosEvaluationError(f"Procedure expects {len(params)} arguments, got {len(args)}")
+            self.update(zip(params, args))
+
         self.outer = outer
-        # Macros are stored separately to prevent them from being called as functions.
         self.macros = {}
 
     def find(self, var: Symbol) -> 'Environment':
-        """Finds the innermost environment where a variable is defined."""
+        """Finds the innermost environment where a variable is defined (lexical scope)."""
         if var in self:
             return self
         elif self.outer is not None:
@@ -37,13 +54,31 @@ class Environment(dict):
         elif self.outer is not None:
             return self.outer.find_macro(var)
         else:
-            return None # Return None if macro is not found, not an error
+            return None
+
+    def find_dynamic(self, var: Symbol, default=None):
+        """
+        Finds a dynamically scoped variable. It searches only the current
+        environment and its direct parent chain, without crossing function
+        boundaries (which would be stored in a closure). This is used for
+        special variables like *%eval-kernel%*.
+        """
+        if var in self:
+            return self[var]
+        elif self.outer is not None:
+            return self.outer.find_dynamic(var, default)
+        else:
+            return default
 
 from .parser import parse
 from .utils import lisp_str
 
-def create_global_env() -> Environment:
-    """Creates and returns the default global environment."""
+def create_global_env(interpreter) -> Environment:
+    """
+    Creates and returns the default global environment.
+    The interpreter instance is passed in to allow primitives like `apply`
+    to call back into the evaluation process.
+    """
     env = Environment()
     env.update({
         # Mathematical operators
@@ -65,7 +100,6 @@ def create_global_env() -> Environment:
             else (_ for _ in ()).throw(LogosAssertionError(f"Assertion Failed: Expected {expected}, but got {actual}"))
         ),
         Symbol('abs'): abs,
-        Symbol('apply'): lambda proc, args: proc(*args),
         Symbol('car'): lambda x: x[0],
         Symbol('cdr'): lambda x: x[1:],
         Symbol('cons'): lambda x, y: [x] + y,
@@ -74,13 +108,12 @@ def create_global_env() -> Environment:
         Symbol('length'): len,
         Symbol('list'): lambda *x: list(x),
         Symbol('list?'): lambda x: isinstance(x, list),
-        Symbol('map'): lambda proc, lst: list(map(proc, lst)),
         Symbol('max'): max,
         Symbol('min'): min,
         Symbol('not'): op.not_,
         Symbol('null?'): lambda x: x == [],
         Symbol('number?'): lambda x: isinstance(x, (int, float)),
-        Symbol('procedure?'): callable,
+        Symbol('procedure?'): lambda p: callable(p) or isinstance(p, Procedure),
         Symbol('round'): round,
         Symbol('symbol?'): lambda x: isinstance(x, Symbol),
 
@@ -93,20 +126,86 @@ def create_global_env() -> Environment:
         Symbol('list-directory'): lambda path: [Symbol(item) for item in os.listdir(path)],
 
         # Hash-map functions
-        Symbol('hash-get'): lambda h_map, key: h_map.get(key),
+        Symbol('hash-get'): lambda h_map, key, default=None: h_map.get(key, default),
         Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
 
         # Utility functions
         Symbol('member?'): lambda item, lst: item in lst,
-        Symbol('filter'): lambda pred, lst: list(filter(pred, lst)),
         Symbol('ends-with?'): lambda s, suffix: s.endswith(suffix),
+        Symbol('current-time'): time.time,
     })
+
+    # Primitives that need access to the interpreter
+    def apply_proc(proc, args):
+        if isinstance(proc, Procedure):
+            # Cannot be TCO'd from here, so we evaluate directly.
+            return interpreter.evaluate(proc.body, Environment(proc.params, args, proc.env))
+        elif callable(proc):
+            return proc(*args)
+        else:
+            raise LogosEvaluationError(f"apply: expected a procedure, but got {type(proc)}")
+    env[Symbol('apply')] = apply_proc
+
+    def map_proc(proc, lst):
+        # We must re-implement map to handle our own Procedure objects
+        result = []
+        for item in lst:
+            result.append(apply_proc(proc, [item]))
+        return result
+    env[Symbol('map')] = map_proc
+
+    def filter_proc(pred, lst):
+        # We must re-implement filter to handle our own Procedure objects
+        result = []
+        for item in lst:
+            if apply_proc(pred, [item]):
+                result.append(item)
+        return result
+    env[Symbol('filter')] = filter_proc
+
     # 'append' needs to be variadic, so we define it separately.
     def variadic_append(*lists):
         result = []
         for lst in lists:
+            if not isinstance(lst, list):
+                raise LogosEvaluationError(f"append: expected lists, but got {type(lst)}")
             result.extend(lst)
         return result
     env[Symbol('append')] = variadic_append
+
+    # A simple unique symbol generator for macro hygiene
+    gensym_counter = 0
+    def gensym(prefix="G"):
+        nonlocal gensym_counter
+        gensym_counter += 1
+        return Symbol(f"{prefix}{gensym_counter}")
+    env[Symbol('gensym')] = gensym
+
+    def print_proc(*args):
+        """A simple print function for debugging."""
+        print(*map(lisp_str, args))
+        return None
+    env[Symbol('print')] = print_proc
+
+    def string_append_proc(*args):
+        """Concatenates multiple values into a single string."""
+        return "".join(map(lambda x: lisp_str(x, escape_str=False), args))
+    env[Symbol('string-append')] = string_append_proc
+
+    # Kernel management primitives
+    def register_kernel(name, kernel_map):
+        if not isinstance(name, Symbol):
+            raise LogosEvaluationError(f"register-kernel!: name must be a symbol, but got {type(name)}")
+        if not isinstance(kernel_map, dict):
+            raise LogosEvaluationError(f"register-kernel!: kernel must be a hash-map, but got {type(kernel_map)}")
+        interpreter.kernels[name] = kernel_map
+        return name
+    env[Symbol('register-kernel!')] = register_kernel
+
+    def get_kernel(name):
+        if not isinstance(name, Symbol):
+            raise LogosEvaluationError(f"get-kernel: name must be a symbol, but got {type(name)}")
+        return interpreter.kernels.get(name)
+    env[Symbol('get-kernel')] = get_kernel
 
     return env

@@ -8,6 +8,16 @@ class Symbol(str):
     # A unique object to mark lists that need to be spliced.
     SPLICE = object()
 
+class Procedure:
+    """
+    Represents a user-defined procedure (lambda). It captures the parameters,
+    body, and the environment in which it was created (its closure).
+    """
+    def __init__(self, params, body, env):
+        self.params = params
+        self.body = body
+        self.env = env
+
 class Macro:
     """Represents a macro, holding its parameters and body."""
     def __init__(self, params, body, env):
