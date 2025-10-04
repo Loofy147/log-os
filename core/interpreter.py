@@ -52,7 +52,7 @@ def evaluate(x, env: Environment):
     """
     if isinstance(x, Symbol):
         try:
-            return env.find(x)[x]
+            return env.get(x)
         except NameError:
             raise LogosEvaluationError(f"Symbol '{x}' not found.")
 
@@ -82,20 +82,22 @@ def evaluate(x, env: Environment):
 
     elif op == 'defvar':
         (symbol, expr) = args
-        env[symbol] = evaluate(expr, env)
-        return env[symbol]
+        value = evaluate(expr, env)
+        env.define(symbol, value)
+        return value
 
     elif op == 'defmacro':
         (name, params, *body) = args
         body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
-        macro_proc = evaluate([Symbol('lambda'), params, body_expr], env)
-        env.macros[name] = macro_proc
+        macro = Macro(params, body_expr, env)
+        env.define_macro(name, macro)
         return None
 
     elif op == 'set!':
         (symbol, expr) = args
-        env.find(symbol)[symbol] = evaluate(expr, env)
-        return env.find(symbol)[symbol]
+        value = evaluate(expr, env)
+        env.set(symbol, value)
+        return value
 
     elif op == 'lambda':
         (params, *body) = args
@@ -110,13 +112,14 @@ def evaluate(x, env: Environment):
                 raise LogosEvaluationError("Syntax error: '.' in parameter list.")
             fixed_params = params[:dot_index]
             rest_param = params[dot_index + 1]
+
         def lambda_func(*arguments):
             local_env = Environment(outer=env)
             if rest_param:
                 if len(arguments) < len(fixed_params):
                     raise LogosEvaluationError(f"Procedure expects at least {len(fixed_params)} arguments, got {len(arguments)}")
                 local_env.update(zip(fixed_params, arguments))
-                local_env[rest_param] = list(arguments[len(fixed_params):])
+                local_env.define(rest_param, list(arguments[len(fixed_params):]))
             else:
                 if len(fixed_params) != len(arguments):
                     raise LogosEvaluationError(f"Procedure expects {len(fixed_params)} arguments, got {len(arguments)}")
@@ -126,11 +129,13 @@ def evaluate(x, env: Environment):
 
     elif op == 'defun':
         (name, params, *body) = args
+        # Skip docstring if present
         if isinstance(body[0], str) and not isinstance(body[0], Symbol):
             body = body[1:]
         body_expr = body[0] if len(body) == 1 else [Symbol('begin')] + body
-        env[name] = evaluate(['lambda', params, body_expr], env)
-        return env[name]
+        func = evaluate([Symbol('lambda'), params, body_expr], env)
+        env.define(name, func)
+        return func
 
     elif op == 'begin':
         result = None
@@ -159,8 +164,11 @@ def evaluate(x, env: Environment):
         filepath = evaluate(filepath_expr, env)
         if not isinstance(filepath, str):
             raise LogosEvaluationError(f"load expected a string filepath, but got {type(filepath)}")
-        with open(filepath) as f:
-            source = f.read()
+        try:
+            with open(filepath) as f:
+                source = f.read()
+        except FileNotFoundError:
+            raise LogosError(f"File not found: {filepath}")
         asts = parse_stream(source)
         result = None
         for ast in asts:
@@ -178,15 +186,42 @@ def evaluate(x, env: Environment):
         return hash_map
 
     else:
+        # Macro expansion
         if isinstance(op, Symbol):
             macro_env = env.find_macro(op)
             if macro_env:
                 macro = macro_env.macros[op]
-                expanded_ast = macro(*args)
+
+                # Create a temporary environment for macro expansion
+                macro_expansion_env = Environment(outer=macro.env)
+
+                # Bind macro arguments to parameters
+                # Handle variadic macros
+                params = macro.params
+                if Symbol('.') in params:
+                    dot_index = params.index(Symbol('.'))
+                    fixed_params = params[:dot_index]
+                    rest_param = params[dot_index + 1]
+                    if len(args) < len(fixed_params):
+                        raise LogosEvaluationError(f"Macro '{op}' expects at least {len(fixed_params)} arguments, got {len(args)}")
+                    macro_expansion_env.update(zip(fixed_params, args))
+                    macro_expansion_env.define(rest_param, list(args[len(fixed_params):]))
+                else:
+                    if len(params) != len(args):
+                        raise LogosEvaluationError(f"Macro '{op}' expects {len(params)} arguments, but got {len(args)}")
+                    macro_expansion_env.update(zip(params, args))
+
+                # Evaluate the macro body in the temporary environment to get the expanded code
+                expanded_ast = evaluate(macro.body, macro_expansion_env)
+
+                # Evaluate the expanded code in the original environment
                 return evaluate(expanded_ast, env)
+
+        # Procedure call
         proc = evaluate(op, env)
         if not callable(proc):
             raise LogosEvaluationError(f"'{op}' is not a procedure.")
+
         evaluated_args = [evaluate(arg, env) for arg in args]
         try:
             return proc(*evaluated_args)
