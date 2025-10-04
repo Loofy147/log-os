@@ -36,17 +36,17 @@ We have successfully completed the foundational phase. The system is currently i
 
 **Checklist:**
 -   [ ] **1. Build the Self-Hosted Test Harness:**
-    -   [x] Create `stdlib/test.l0`.
-    -   [x] Implement `deftest` and `is-error?` macros.
-    -   [x] Implement `report-test-results` function.
+    -   [ ] Create `stdlib/test.l0`.
+    -   [ ] Implement `deftest` and `is-error?` macros.
+    -   [ ] Implement `report-test-results` function.
 -   [ ] **2. Build the Contract & Specification System:**
-    -   [x] Create `stdlib/contract.l0`.
-    -   [x] Implement `defun/c` macro for defining functions with pre- and post-conditions.
-    -   [x] Create `tests/test_contracts.l0` and validate the system.
+    -   [ ] Create `stdlib/contract.l0`.
+    -   [ ] Implement `defun/c` macro for defining functions with pre- and post-conditions.
+    -   [ ] Create `tests/test_contracts.l0` and validate the system.
 -   [ ] **3. Build the Polymorphism & Abstraction System:**
-    -   [x] Create `stdlib/multimethod.l0`.
-    -   [x] Implement `defmulti` and `defmethod` macros.
-    -   [x] Create `tests/test_multimethod.l0` and validate the system.
+    -   [ ] Create `stdlib/multimethod.l0`.
+    -   [ ] Implement `defmulti` and `defmethod` macros.
+    -   [ ] Create `tests/test_multimethod.l0` and validate the system.
 -   [ ] **4. Build the Genesis of the Standard Library:**
     -   [ ] Create `stdlib/core.l0` to load all components.
     -   [ ] Create `stdlib/list.l0`, `stdlib/hash-map.l0`, etc.

@@ -6,7 +6,7 @@
 (defn make-orch [agents]
   ;; agents: list of agent names as symbols or strings
   ;; returns orchestrator state: map agent -> {:alpha 1 :beta 1 :stats []}
-  (reduce (fn [m a] (assoc m a {:alpha 1 :beta 1 :trials 0 :wins 0})) {} agents))
+  (reduce (fn [m a] (assoc m a (hash-map "alpha" 1 "beta" 1 "trials" 0 "wins" 0))) (hash-map) agents))
 
 (defn sample-agent [orch]
   ;; draw a beta sample per agent, return best agent name

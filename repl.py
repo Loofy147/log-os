@@ -11,7 +11,7 @@ def main():
     global_env = create_global_env(evaluate)
 
     # Load the kernel and core libraries to bootstrap the language
-    core_files = ["kernel.l0", "core/evaluators.l0", "core/orchestrator.l0"]
+    core_files = ["kernel.l0", "core/evaluators.l0", "core/orchestrator.l0", "stdlib/core.l0"]
     try:
         for core_file in core_files:
             with open(core_file) as f:

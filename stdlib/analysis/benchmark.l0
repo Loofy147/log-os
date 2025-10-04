@@ -8,7 +8,7 @@
         mean (/ (reduce + xs) n)
         var (/ (reduce + (map (fn [x] (* (- x mean) (- x mean))) xs)) n)
         sd (sqrt var)]
-    {:n n :mean mean :sd sd}))
+    (hash-map "n" n "mean" mean "sd" sd)))
 
 (defmacro benchmark [expr n]
   ;; Usage: (benchmark (heavy-fn arg) 100)

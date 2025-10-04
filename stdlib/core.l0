@@ -1,0 +1,17 @@
+;;
+;; stdlib/core.l0
+;;
+;; This file serves as the central entry point for the Log-Os standard library.
+;; It loads all the core modules that provide foundational functionalities.
+;;
+
+(print "Loading Log-Os Standard Library...")
+
+;; Load mathematical utilities
+(load "stdlib/math/beta.l0")
+(load "stdlib/math/random.l0")
+
+;; Load analysis tools
+(load "stdlib/analysis/benchmark.l0")
+
+(print ";; Standard Library loaded.")
