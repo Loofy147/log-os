@@ -1,0 +1,25 @@
+;; stdlib/collections.l0
+;; Generic functions for operating on collections.
+
+;; --- count ---
+
+;; Private dispatcher function for the 'count' multimethod.
+(defn %count-dispatch (coll) (type-of coll))
+
+;; Private multimethod that performs the actual counting based on type.
+(defmulti %count %count-dispatch)
+
+(defmethod %count 'list (coll)
+  (length coll))
+
+(defmethod %count 'hash-map (coll)
+  (hash-count coll))
+
+;; Public-facing 'count' function with a contract.
+;; This provides a single, stable entry point and hides the implementation details.
+(defun/c count
+  (hash-map 'doc "Counts the number of items in a collection.")
+  (coll)
+  ;; The body of the contracted function simply calls the raw multimethod.
+  ;; In the future, this is where contract checks (e.g., checking the return value) would go.
+  (%count coll))

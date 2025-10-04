@@ -1,0 +1,16 @@
+;; tests/test_contracts.l0
+;; Tests for the simple contract system.
+
+(load "stdlib/contracts.l0")
+
+;; Define a simple function with a docstring contract, using correct hash-map syntax.
+(defun/c add-one (hash-map 'doc "Adds one to a number.") (x)
+  (+ x 1))
+
+;; Test that the function is defined and callable.
+(assert-equal (add-one 5) 6)
+
+;; Test with a different value.
+(assert-equal (add-one -1) 0)
+
+(print "Contract system tests passed.")

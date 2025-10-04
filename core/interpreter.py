@@ -83,9 +83,18 @@ def evaluate(x, env: Environment):
 
     elif op == 'defvar':
         (symbol, expr) = args
-        value = evaluate(expr, env)
-        env.define(symbol, value)
-        return value
+        # Find the global environment by traversing up the outer chain.
+        global_env = env
+        while global_env.outer is not None:
+            global_env = global_env.outer
+
+        # Only define the variable if it's not already in the global scope.
+        if symbol not in global_env:
+            value = evaluate(expr, env)
+            global_env.define(symbol, value)
+
+        # Return the value from the global scope.
+        return global_env[symbol]
 
     elif op == 'defmacro':
         (name, params, *body) = args

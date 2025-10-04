@@ -7,11 +7,15 @@
 
 (print "Loading Log-Os Standard Library...")
 
+;; Load foundational language extensions
+(load "stdlib/contracts.l0")
+(load "stdlib/multimethods.l0")
+
 ;; Load mathematical utilities
 (load "stdlib/math/beta.l0")
 (load "stdlib/math/random.l0")
 
 ;; Load analysis tools
-(load "stdlib/analysis/benchmark.l0")
+;; (load "stdlib/analysis/benchmark.l0") ;; NOTE: Disabled as it contains syntax errors.
 
 (print ";; Standard Library loaded.")

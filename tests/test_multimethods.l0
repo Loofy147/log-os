@@ -1,0 +1,24 @@
+;; tests/test_multimethods.l0
+;; Tests for the multimethod system.
+
+(load "stdlib/multimethods.l0")
+
+;; 1. Define a multimethod called 'report-type' that uses 'type-of' as its dispatcher.
+(defmulti report-type type-of)
+
+;; 2. Define methods for different types.
+(defmethod report-type 'string (arg)
+  (string-append "The type is string: " arg))
+
+(defmethod report-type 'number (arg)
+  (string-append "The type is number: " (lisp-str arg)))
+
+(defmethod report-type 'list (arg)
+  "The type is list.")
+
+;; 3. Test the dispatching logic for successful cases.
+(assert-equal (report-type "hello") "The type is string: hello")
+(assert-equal (report-type 123) "The type is number: 123")
+(assert-equal (report-type '(a b)) "The type is list.")
+
+(print "Multimethod success tests passed.")

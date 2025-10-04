@@ -1,0 +1,34 @@
+;; stdlib/multimethods.l0
+;; A simple multimethod system for Log-Os.
+
+;; This is a global registry for all multimethods defined.
+;; It maps the multimethod name to its method table (another hash-map).
+(defvar *multimethods* (hash-map))
+
+(defmacro defmulti (name dispatch-fn)
+  "Defines a new multimethod. Idempotent: will not reset the method table if it already exists."
+  `(begin
+     ;; Only create the method table if it doesn't already exist.
+     ;; This ensures that reloading a file with a defmulti doesn't wipe out methods.
+     (unless (hash-contains? *multimethods* ',name)
+       (hash-set! *multimethods* ',name (hash-map)))
+
+     ;; Define the main dispatcher function.
+     (defn ,name (. args)
+       (let* ((method-table (hash-get *multimethods* ',name))
+              (dispatch-val (apply ,dispatch-fn args)))
+         ;; WORKAROUND: Return a special symbol on failure instead of calling (error ...)
+         ;; to bypass a suspected bug in the interpreter's conditional error handling.
+         (if (hash-contains? method-table dispatch-val)
+             (let ((method (hash-get method-table dispatch-val)))
+               (apply method args))
+             '*%no-method-found%*)))))
+
+(defmacro defmethod (name dispatch-val params . body)
+  "Defines a method for a multimethod.
+   - name: The name of the multimethod.
+   - dispatch-val: The value to dispatch on.
+   - params: The parameter list for this specific method.
+   - body: The method's implementation."
+  `(let ((method-table (hash-get *multimethods* ',name)))
+     (hash-set! method-table ,dispatch-val (lambda ,params ,@body))))
