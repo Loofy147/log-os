@@ -1,0 +1,59 @@
+;; tests/test_synapse.l0
+;; Integration test for the "Project Synapse" Aware Evaluator.
+;; This test verifies that the evaluator can adapt its strategy
+;; based on execution history and tuning parameters.
+
+(load "core/lisp/aware-evaluator.l0")
+
+;; --- Test Setup ---
+
+;; Simulate a "heavy" task by sleeping. This makes the execution time
+;; measurable and significant.
+(defn heavy-work ()
+  (sleep 0.02) ;; Sleep for 20ms to simulate a costly operation
+  42)
+
+;; Define the "AST" for our test. The aware evaluator expects a hash-map
+;; with 'features' for the cost model and a 'fn' to execute.
+(defvar heavy-task (hash-map 'features (hash-map 'id 'heavy-work)
+                             'fn heavy-work))
+
+;; --- Test Execution ---
+
+;; Create the composed evaluator.
+(defvar evaluator (compose-aware-evaluator))
+
+;; 1. First run (Cold Start):
+;;    - The cost model has no history for 'heavy-work', so it returns a default (10.0).
+;;    - The default JIT threshold is 50.0.
+;;    - Since 10.0 < 50.0, the evaluator should choose the 'baseline' path.
+;;    - The telemetry layer will record the actual execution time (around 20ms).
+(print "--- Synapse Test: Run 1 (Cold) ---")
+(evaluator heavy-task (hash-map))
+(let ((stats (get-metric-stats 'eval 'mode)))
+  (print (string-append "Evaluation mode metrics: " (lisp-str stats))))
+(let ((cost (hash-get *%cost-history%* "heavy-work")))
+  (print (string-append "Recorded cost for heavy-work: " (lisp-str cost))))
+
+
+;; 2. Tune the system:
+;;    - Lower the JIT threshold to make it very sensitive. Now, any task
+;;      predicted to take more than 1ms should be JIT-compiled.
+(print "--- Synapse Test: Tuning JIT threshold ---")
+(update-threshold! 'jit-threshold 1.0)
+(print (string-append "New JIT threshold: " (lisp-str (get-threshold 'jit-threshold))))
+
+
+;; 3. Second run (Warm Start):
+;;    - The cost model now has history for 'heavy-work' (approx. 20ms).
+;;    - The new JIT threshold is 1.0.
+;;    - Since 20.0 > 1.0, the evaluator should choose the 'jit' path.
+;;    - The telemetry layer will record that a JIT compilation was triggered.
+(print "--- Synapse Test: Run 2 (Warm) ---")
+(evaluator heavy-task (hash-map))
+(let ((stats (get-metric-stats 'eval 'mode)))
+  (print (string-append "Evaluation mode metrics: " (lisp-str stats))))
+
+(print "--- Synapse Test Complete ---")
+;; The test passes if it runs without errors and the print statements
+;; show the evaluation mode changing from 'baseline' to 'jit'.

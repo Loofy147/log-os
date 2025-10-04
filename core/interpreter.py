@@ -52,7 +52,8 @@ def evaluate(x, env: Environment):
     """
     if isinstance(x, Symbol):
         try:
-            return env.get(x)
+            # Use the find method to search the scope chain correctly.
+            return env.find(x)[x]
         except NameError:
             raise LogosEvaluationError(f"Symbol '{x}' not found.")
 

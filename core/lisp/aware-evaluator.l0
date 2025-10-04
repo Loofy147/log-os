@@ -1,0 +1,57 @@
+;; core/lisp/aware-evaluator.l0
+;; Smart evaluation layers that use telemetry and cost models.
+
+(load "stdlib/cost-model.l0")
+(load "stdlib/tuning.l0")
+
+;; --- The "Base" Evaluator (just calls the given function) ---
+;; In a real integration, this would call the interpreter's primitive 'eval' or 'interpret'.
+;; For this self-contained test, we assume the 'ast' is a hash-map
+;; containing a 'fn' to call.
+(defn base-eval-fn (ast env)
+  (let ((f (hash-get ast 'fn)))
+    (f)))
+
+;; --- Predictive JIT Layer (Simulated JIT, Real Prediction) ---
+;; This is a higher-order function that takes an evaluator function (eval-fn)
+;; and returns a new, enhanced evaluator function.
+(defn with-predictive-jit-layer (eval-fn)
+  (lambda (ast env)
+    (let* ((features (hash-get ast 'features (hash-map 'id 'unknown)))
+           (predicted-cost (predict-execution-cost features))
+           (threshold (get-threshold 'jit-threshold)))
+
+      (if (> predicted-cost threshold)
+          (begin
+            (record-metric! 'jit 'compiled 1)
+            (record-metric! 'eval 'mode 'jit)
+            ;; In a real JIT, we would call a compiled version of the function.
+            ;; Here, we just call the original function.
+            (eval-fn ast env))
+          (begin
+            (record-metric! 'eval 'mode 'baseline)
+            (eval-fn ast env))))))
+
+;; --- Telemetry Layer (Wraps everything to measure time) ---
+;; This is another higher-order function that wraps an evaluator.
+(defn with-telemetry-layer (eval-fn)
+  (lambda (ast env)
+    (let ((t0 (current-time-ms)))
+      (let ((result (eval-fn ast env)))
+        ;; Use let* to ensure sequential binding, so 't1' is available for 'execution-time'.
+        (let* ((t1 (current-time-ms))
+               (execution-time (- t1 t0)))
+          ;; Record the raw execution time.
+          (record-metric! 'eval 'time-ms execution-time)
+          ;; Feed the actual cost back into the cost model to improve future predictions.
+          (let ((features (hash-get ast 'features (hash-map))))
+            (record-execution-cost! features execution-time))
+          result)))))
+
+;; --- The Composer ---
+;; This function composes the final evaluator by stacking the layers.
+;; The order is important: Telemetry -> Predictive JIT -> Base
+(defn compose-aware-evaluator ()
+  (with-telemetry-layer
+    (with-predictive-jit-layer
+      base-eval-fn)))
