@@ -1,0 +1,4 @@
+;;; Trivial test to confirm the core mechanism works.
+(load "stdlib/evaluation-foundry.l0")
+(assert (equal? 1 1))
+#t

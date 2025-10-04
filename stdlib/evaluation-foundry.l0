@@ -1,0 +1,48 @@
+;; stdlib/evaluation-foundry.l0
+;; The self-hosted workshop for creating and composing evaluation kernels.
+;; This library provides the tools for Log-Os to inspect, modify, and
+;; switch its own evaluation strategies at runtime.
+
+(defmacro with-eval-kernel (kernel-name-expr . body)
+  "Executes body with a specific evaluation kernel.
+  This is the high-level, safe interface for dynamically changing the
+  evaluation strategy. It uses the low-level `push-kernel!` and
+  `pop-kernel!` primitives and guarantees that the kernel stack is
+  always restored, even if an error occurs in the body.
+
+  Example: (with-eval-kernel 'caching (my-slow-function))"
+  (let ((result-sym (gensym))
+        (error-sym (gensym)))
+    `(begin
+       (push-kernel! (get-kernel ,kernel-name-expr))
+       (let ((,result-sym #f))
+         (try
+           ;; Evaluate the main body of code
+           (set! ,result-sym (begin ,@body))
+
+           (catch ,error-sym
+             ;; --- Unwind Action on Error ---
+             ;; The kernel MUST be popped before re-throwing the error
+             ;; to prevent stack corruption.
+             (pop-kernel!)
+             (error ,error-sym)))
+
+         ;; --- Normal Unwind Action ---
+         ;; Pop the kernel from the stack after successful execution.
+         (pop-kernel!)
+         ,result-sym)))) ; Return the result of the body
+
+(defmacro defkernel (name params . body)
+  "Defines a new evaluation kernel constructor.
+  This creates a function that, when called, evaluates the body
+  to produce and return a new kernel object (or, in this simulation,
+  the name of a kernel to use)."
+  `(defun ,name ,params
+     (begin ,@body)))
+
+(defun with-caching-layer (base-kernel)
+  "SIMULATED: This function simulates composing a new kernel.
+  In a more advanced implementation, this would dynamically construct
+  a new kernel object. For now, it represents the concept of applying
+  a caching layer by returning the name of the pre-built CachingKernel."
+  'caching)

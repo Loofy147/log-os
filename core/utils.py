@@ -4,13 +4,14 @@ Shared utility functions for the Log-Os project.
 """
 from .types import Symbol
 
-def lisp_str(exp) -> str:
+def lisp_str(exp, escape_str=True) -> str:
     """
     Converts a Python object back into a LISP-readable string.
-    Symbols are unquoted, strings are double-quoted.
+    Symbols are unquoted, strings are double-quoted by default.
     """
     if isinstance(exp, list):
-        return '(' + ' '.join(map(lisp_str, exp)) + ')'
+        # Recursively call lisp_str, passing the escape_str parameter along.
+        return '(' + ' '.join(map(lambda e: lisp_str(e, escape_str), exp)) + ')'
     elif exp is True:
         return '#t'
     elif exp is False:
@@ -18,6 +19,7 @@ def lisp_str(exp) -> str:
     elif isinstance(exp, Symbol):
         return exp
     elif isinstance(exp, str):
-        return f'"{exp}"'
+        # Only add quotes if escape_str is True.
+        return f'"{exp}"' if escape_str else exp
     else:
         return str(exp)
