@@ -56,21 +56,18 @@ def test_multimethods_l0_success(lisp_eval_env):
     run_lisp_file(lisp_eval, "tests/test_multimethods.l0")
 
 def test_multimethods_l0_error_on_no_method(lisp_eval_env):
-    """
-    Tests that the multimethod dispatcher returns a special symbol
-    when no method is found (workaround for interpreter bug).
-    """
+    """Tests that the multimethod system correctly raises an error for an undefined method."""
+    from core.errors import LogosEvaluationError
     lisp_eval, env = lisp_eval_env
 
     # Load the multimethods library and the test file which defines the 'report-type' multimethod.
     run_lisp_file(lisp_eval, "stdlib/multimethods.l0")
     run_lisp_file(lisp_eval, "tests/test_multimethods.l0")
 
-    # Call 'report-type' with a boolean (for which no method is defined).
-    result = lisp_eval(parse("(report-type #f)"))
-
-    # Assert that the result is the special error symbol.
-    assert result == Symbol('*%no-method-found%*')
+    # Assert that calling 'report-type' with a boolean (for which no method is defined)
+    # raises the correct evaluation error.
+    with pytest.raises(LogosEvaluationError, match="No method found for report-type with dispatch value: boolean"):
+        lisp_eval(parse("(report-type #f)"))
 
 def test_stdlib_l0(lisp_eval_env):
     """

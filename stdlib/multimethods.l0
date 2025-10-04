@@ -17,12 +17,11 @@
      (defn ,name (. args)
        (let* ((method-table (hash-get *multimethods* ',name))
               (dispatch-val (apply ,dispatch-fn args)))
-         ;; WORKAROUND: Return a special symbol on failure instead of calling (error ...)
-         ;; to bypass a suspected bug in the interpreter's conditional error handling.
          (if (hash-contains? method-table dispatch-val)
              (let ((method (hash-get method-table dispatch-val)))
                (apply method args))
-             '*%no-method-found%*)))))
+             (error (string-append "No method found for " (lisp-str ',name)
+                                   " with dispatch value: " (lisp-str dispatch-val))))))))
 
 (defmacro defmethod (name dispatch-val params . body)
   "Defines a method for a multimethod.
