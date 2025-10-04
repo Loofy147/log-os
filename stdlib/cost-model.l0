@@ -1,0 +1,27 @@
+;; stdlib/cost-model.l0
+;; Tracks execution costs and predicts future costs.
+
+(load "stdlib/telemetry.l0")
+
+;; Store history in a global hash-map for now.
+;; In a real system, this would need to be more robust, possibly
+;; with eviction policies or aggregation.
+(defvar *%cost-history%* (hash-map))
+
+(defn feature-key (features)
+  "Creates a simple string key from features (e.g., based on function name)."
+  (lisp-str (hash-get features 'id "unknown")))
+
+(defn record-execution-cost! (features actual-cost)
+  "Records the actual cost of an execution."
+  (let ((key (feature-key features)))
+    ;; For now, we just store the last cost. A more advanced model
+    ;; would keep a history, calculate a moving average, or use a more
+    ;; sophisticated prediction algorithm.
+    (hash-set! *%cost-history%* key actual-cost)))
+
+(defn predict-execution-cost (features)
+  "Predicts cost based on history. Returns a default if unknown."
+  (let ((key (feature-key features)))
+    ;; Use a default cost of 10.0 if we have no history for this feature set.
+    (hash-get *%cost-history%* key 10.0)))

@@ -1,0 +1,30 @@
+;; stdlib/tuning.l0
+;; Manages adaptive thresholds for optimization decisions.
+
+(load "stdlib/telemetry.l0")
+
+;; Store thresholds in a global hash-map. In a real system, these might
+;; be persisted or managed by a more complex configuration system.
+(defvar *%thresholds%* (hash-map
+                         'jit-threshold 50.0
+                         'cache-hit-rate-target 0.5))
+
+(defn get-threshold (key)
+  "Retrieves a tuning threshold by its key."
+  (hash-get *%thresholds%* key))
+
+(defn update-threshold! (key value)
+  "Updates a tuning threshold."
+  (hash-set! *%thresholds%* key value))
+
+(defn auto-tune-thresholds! ()
+  "Analyzes metrics and adjusts thresholds. (Simplified for Synapse)"
+  ;; This is a placeholder for a future, more intelligent auto-tuner.
+  ;; A real implementation would analyze metrics from get-metric-stats
+  ;; and adjust thresholds like 'jit-threshold' based on observed
+  ;; performance and cost-benefit analysis.
+  ;;
+  ;; For this initial implementation, we'll just log that the function
+  ;; was called to confirm the mechanism is in place.
+  (record-metric! 'tuning 'run 1)
+  #t)

@@ -1,0 +1,22 @@
+;; stdlib/telemetry.l0
+;; Provides high-level functions for collecting and analyzing metrics.
+
+;; Note: Using 'defn' as 'defun/c' (contracts) is not yet implemented.
+(defn record-metric! (category key value)
+  "Records a metric value for a category and key."
+  ;; Call the raw primitive. In the future, this could do more (e.g., aggregation).
+  (record-metric-raw! (lisp-str category) (lisp-str key) value))
+
+;; Simple statistical helpers (can be moved to math lib later)
+(defn mean (numbers)
+  (if (null? numbers) 0 (/ (apply + numbers) (length numbers))))
+
+(defn get-metric-stats (category key)
+  "Calculates stats (mean, count) for a metric."
+  (let* ((raw-data (get-metrics-raw))
+         (full-key (string-append (lisp-str category) "." (lisp-str key)))
+         (entries (hash-get raw-data full-key '())))
+    (if (null? entries)
+        (hash-map 'mean 0 'count 0)
+        (let ((values (map (lambda (e) (hash-get e 'value)) entries)))
+          (hash-map 'mean (mean values) 'count (length values))))))

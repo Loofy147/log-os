@@ -1,118 +1,4 @@
 # core/environment.py
-<<<<<< professional-overhaul
-import math
-import operator as op
-from .types import Symbol
-
-class Environment:
-    """
-    A class to represent the lexical environment for the interpreter,
-    handling variable and macro scopes.
-    """
-    def __init__(self, outer=None):
-        self.outer = outer
-        self.vars = {}
-        self.macros = {}
-
-    def find(self, var):
-        """
-        Find the innermost environment where a variable is defined.
-        Searches up the scope chain from the current environment.
-        Returns the environment if found, otherwise None.
-        """
-        if var in self.vars:
-            return self
-        if self.outer is not None:
-            return self.outer.find(var)
-        return None
-
-    def get(self, var):
-        """
-        Get the value of a variable from the environment.
-        Raises a NameError if the variable is not found.
-        """
-        env_with_var = self.find(var)
-        if env_with_var is None:
-            raise NameError(f"'{var}' is not defined")
-        return env_with_var.vars[var]
-
-    def define(self, var, value):
-        """
-        Define a variable in the current environment.
-        """
-        self.vars[var] = value
-        return value
-
-    def set(self, var, value):
-        """
-        Set the value of an existing variable in the environment.
-        Searches up the scope chain and updates the variable where it is found.
-        Raises a NameError if the variable is not found.
-        """
-        env_with_var = self.find(var)
-        if env_with_var is None:
-            raise NameError(f"Cannot set! undefined variable '{var}'")
-        env_with_var.vars[var] = value
-        return value
-
-    def update(self, other_dict):
-        """Update the environment from another dictionary."""
-        self.vars.update(other_dict)
-
-    def define_macro(self, name, macro):
-        """Define a macro in the current environment."""
-        self.macros[name] = macro
-
-    def find_macro(self, name):
-        """
-        Find the innermost environment where a macro is defined.
-        Searches up the scope chain from the current environment.
-        Returns the environment if found, otherwise None.
-        """
-        if name in self.macros:
-            return self
-        if self.outer is not None:
-            return self.outer.find_macro(name)
-        return None
-
-def create_global_env(evaluate_fn):
-    """
-    Creates the global environment and populates it with
-    primitive procedures.
-    """
-    env = Environment()
-
-    # Mathematical functions
-    env.vars.update(vars(math))
-    env.vars.update({
-        '+': op.add, '-': op.sub, '*': op.mul, '/': op.truediv,
-        '>': op.gt, '<': op.lt, '>=': op.ge, '<=': op.le, '=': op.eq,
-        'abs': abs,
-        'append': op.add,
-        'apply': lambda f, args: f(*args),
-        'begin': lambda *x: x[-1],
-        'car': lambda x: x[0],
-        'cdr': lambda x: x[1:],
-        'cons': lambda x, y: [x] + y,
-        'eq?': op.is_,
-        'equal?': op.eq,
-        'length': len,
-        'list': lambda *x: list(x),
-        'list?': lambda x: isinstance(x, list),
-        'map': lambda f, x: list(map(f, x)),
-        'max': max,
-        'min': min,
-        'not': op.not_,
-        'null?': lambda x: x == [],
-        'number?': lambda x: isinstance(x, (int, float)),
-        'procedure?': callable,
-        'round': round,
-        'symbol?': lambda x: isinstance(x, Symbol)
-    })
-
-    # Add `eval` to the environment, using the passed-in evaluator
-    env.define('eval', lambda expr: evaluate_fn(expr, env))
-=======
 """
 Defines the default global environment for the Log-Os interpreter.
 This environment contains built-in procedures and standard library functions.
@@ -124,6 +10,8 @@ import functools
 import os
 import time
 import random
+import threading
+from collections import defaultdict
 
 from .types import Symbol, List, Atom
 from .errors import LogosEvaluationError, LogosAssertionError
@@ -132,6 +20,21 @@ from .errors import LogosEvaluationError, LogosAssertionError
 L0_CACHE = {}
 L0_JIT_SEEN_ASTS = set()
 
+# Thread-safe metrics store
+_metrics = defaultdict(list)
+_metrics_lock = threading.Lock()
+
+def _record_metric(category, key, value):
+    with _metrics_lock:
+        _metrics[f"{category}.{key}"].append({
+            'timestamp': int(time.time() * 1000),
+            'value': value
+        })
+
+def _get_metrics_raw():
+    with _metrics_lock:
+        # Return a copy to avoid issues with concurrent modification
+        return dict(_metrics)
 
 class Environment(dict):
     """A dictionary with an outer scope and a separate space for macros."""
@@ -150,6 +53,15 @@ class Environment(dict):
             return self.outer.find(var)
         else:
             raise NameError(f"Symbol '{var}' is not defined.")
+
+    def define(self, var, value):
+        """Defines a variable in the current environment."""
+        self[var] = value
+        return value
+
+    def define_macro(self, name, macro):
+        """Define a macro in the current environment."""
+        self.macros[name] = macro
 
     def find_macro(self, var: Symbol) -> 'Environment':
         """Finds the innermost environment where a macro is defined."""
@@ -216,10 +128,13 @@ def create_global_env(eval_func) -> Environment:
         # Hash-map functions
         Symbol('hash-get'): lambda h_map, key, default=None: h_map.get(key, default),
         Symbol('hash-set!'): lambda h_map, key, val: h_map.update({key: val}),
+        # --- NEW: Needed for Cost Model ---
+        Symbol('hash-contains?'): lambda d, k: k in d,
 
         # Orchestrator Primitives
         Symbol('interpret'): lambda ast, env: eval_func(ast, env),
-        Symbol('current-time-ms'): lambda: time.time() * 1000,
+        # --- MODIFIED: Ensure integer timestamp ---
+        Symbol('current-time-ms'): lambda: int(time.time() * 1000),
         Symbol('random'): random.random,
         Symbol('gamma-sample'): lambda alpha: random.gammavariate(alpha, 1.0),
         Symbol('log'): math.log,
@@ -233,10 +148,18 @@ def create_global_env(eval_func) -> Environment:
         Symbol('simulate-jit-compile'): lambda ast: time.sleep(0.001), # Lightweight placeholder
         Symbol('cache-key'): lambda ast, env: lisp_str(ast),
 
+        # --- NEW: Telemetry Primitives ---
+        Symbol('record-metric-raw!'): _record_metric,
+        Symbol('get-metrics-raw'): _get_metrics_raw,
+
         # Utility functions
         Symbol('member?'): lambda item, lst: item in lst,
         Symbol('filter'): lambda pred, lst: list(filter(pred, lst)),
         Symbol('ends-with?'): lambda s, suffix: s.endswith(suffix),
+        Symbol('print'): print,
+        Symbol('sleep'): time.sleep,
+        Symbol('string-append'): lambda *args: "".join(map(str, args)),
+        Symbol('lisp-str'): lisp_str,
     })
     # 'append' needs to be variadic, so we define it separately.
     def variadic_append(*lists):
@@ -245,6 +168,5 @@ def create_global_env(eval_func) -> Environment:
             result.extend(lst)
         return result
     env[Symbol('append')] = variadic_append
->>>>>> main
 
     return env

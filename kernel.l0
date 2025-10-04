@@ -28,3 +28,10 @@
 (defmacro defn (name params . body)
   "A convenience macro for defining a named function."
   `(defun ,name ,params ,@body))
+
+(defmacro let* (bindings . body)
+  "Binds variables sequentially, allowing each binding to refer to previous ones."
+  (if (null? bindings)
+      `(begin ,@body)
+      `(let (,(car bindings))
+         (let* ,(cdr bindings) ,@body))))
