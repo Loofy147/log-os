@@ -12,7 +12,6 @@ import time
 
 from .types import Symbol, List, Atom
 from .errors import LogosEvaluationError, LogosAssertionError
-
 from .types import Procedure
 
 class Environment(dict):
@@ -39,7 +38,7 @@ class Environment(dict):
         self.macros = {}
 
     def find(self, var: Symbol) -> 'Environment':
-        """Finds the innermost environment where a variable is defined (lexical scope)."""
+        """Finds the innermost environment where a variable is defined."""
         if var in self:
             return self
         elif self.outer is not None:
@@ -54,21 +53,7 @@ class Environment(dict):
         elif self.outer is not None:
             return self.outer.find_macro(var)
         else:
-            return None
-
-    def find_dynamic(self, var: Symbol, default=None):
-        """
-        Finds a dynamically scoped variable. It searches only the current
-        environment and its direct parent chain, without crossing function
-        boundaries (which would be stored in a closure). This is used for
-        special variables like *%eval-kernel%*.
-        """
-        if var in self:
-            return self[var]
-        elif self.outer is not None:
-            return self.outer.find_dynamic(var, default)
-        else:
-            return default
+            return None # Return None if macro is not found, not an error
 
 from .parser import parse
 from .utils import lisp_str
@@ -132,13 +117,11 @@ def create_global_env(interpreter) -> Environment:
         # Utility functions
         Symbol('member?'): lambda item, lst: item in lst,
         Symbol('ends-with?'): lambda s, suffix: s.endswith(suffix),
-        Symbol('current-time'): time.time,
     })
 
     # Primitives that need access to the interpreter
     def apply_proc(proc, args):
         if isinstance(proc, Procedure):
-            # Cannot be TCO'd from here, so we evaluate directly.
             return interpreter.evaluate(proc.body, Environment(proc.params, args, proc.env))
         elif callable(proc):
             return proc(*args)
@@ -147,20 +130,11 @@ def create_global_env(interpreter) -> Environment:
     env[Symbol('apply')] = apply_proc
 
     def map_proc(proc, lst):
-        # We must re-implement map to handle our own Procedure objects
-        result = []
-        for item in lst:
-            result.append(apply_proc(proc, [item]))
-        return result
+        return [apply_proc(proc, [item]) for item in lst]
     env[Symbol('map')] = map_proc
 
     def filter_proc(pred, lst):
-        # We must re-implement filter to handle our own Procedure objects
-        result = []
-        for item in lst:
-            if apply_proc(pred, [item]):
-                result.append(item)
-        return result
+        return [item for item in lst if apply_proc(pred, [item])]
     env[Symbol('filter')] = filter_proc
 
     # 'append' needs to be variadic, so we define it separately.
@@ -191,6 +165,8 @@ def create_global_env(interpreter) -> Environment:
         """Concatenates multiple values into a single string."""
         return "".join(map(lambda x: lisp_str(x, escape_str=False), args))
     env[Symbol('string-append')] = string_append_proc
+
+    env[Symbol('current-time')] = time.time
 
     # Kernel management primitives
     def register_kernel(name, kernel_map):

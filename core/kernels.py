@@ -88,10 +88,14 @@ class BaselineKernel(EvaluationKernel):
         if op == 'push-kernel!':
             (kernel_expr,) = args
             kernel = self.evaluate(kernel_expr, env)
+            if not isinstance(kernel, EvaluationKernel):
+                raise LogosEvaluationError(f"push-kernel!: expected a kernel object, but got {type(kernel)}")
             self.interpreter.kernel_stack.append(kernel)
             return None
 
         if op == 'pop-kernel!':
+            if len(self.interpreter.kernel_stack) <= 1:
+                raise LogosEvaluationError("pop-kernel!: cannot pop the last kernel from the stack.")
             return self.interpreter.kernel_stack.pop()
 
         if op == 'lambda':
@@ -107,7 +111,11 @@ class BaselineKernel(EvaluationKernel):
 
         if op == 'try':
             try_expr, catch_clause = args
+            if not isinstance(catch_clause, List) or not catch_clause or catch_clause[0] != Symbol('catch'):
+                raise LogosEvaluationError("try form must be followed by a (catch err-var . body) clause.")
             _catch_op, err_var, *catch_body = catch_clause
+            if not isinstance(err_var, Symbol):
+                 raise LogosEvaluationError(f"catch variable must be a symbol, but got {type(err_var)}")
             try:
                 return self.evaluate(try_expr, env)
             except LogosError as e:

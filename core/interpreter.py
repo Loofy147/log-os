@@ -8,7 +8,7 @@ dispatches evaluation to different "kernels".
 
 from .types import Symbol, List
 from .environment import Environment
-from .errors import LogosEvaluationError
+from .errors import LogosEvaluationError, LogosError
 from .kernels import BaselineKernel, CachingKernel
 
 

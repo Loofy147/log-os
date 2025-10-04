@@ -1,4 +1,33 @@
-;;; Trivial test to confirm the core mechanism works.
+;; tests/test_foundry.l0
+;; This file contains the self-hosted test suite for the dynamic
+;; evaluation features of Project Vulcan.
+
+;; Load the library we are testing
 (load "stdlib/evaluation-foundry.l0")
-(assert (equal? 1 1))
+
+;; Define a classic slow recursive function to test caching
+(defun fib (n)
+  (if (< n 2)
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+;; --- Test 1: Verify the core kernel-switching mechanism ---
+
+;; Push the caching kernel onto the stack
+(push-kernel! (get-kernel 'caching))
+
+;; Verify that the kernel works and produces the correct result.
+;; We use a smaller number for fib to ensure the test runs quickly.
+(defvar result (fib 10))
+(assert (equal? result 55))
+
+;; Pop the kernel to restore the original state
+(pop-kernel!)
+
+;; Verify that the baseline kernel is now active by calling fib again.
+;; This is an implicit test; if it fails, the test runner would hang or error.
+(fib 5)
+
+
+;; If all assertions passed, return #t to signal success to the test runner.
 #t
