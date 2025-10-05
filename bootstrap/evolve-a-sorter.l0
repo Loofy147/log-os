@@ -1,0 +1,78 @@
+;; bootstrap/evolve-a-sorter.l0
+;;
+;; This is the main experiment file for Project Prometheus Legion.
+;; It sets up the problem of evolving a sorting function and then
+;; runs the structure-aware evolver to find a solution.
+
+(load "bootstrap/structure-aware-evolver.l0")
+
+;; --- Problem Definition ---
+
+(defvar sort-training-data
+  '(
+    ((3 1 2) (1 2 3))
+    (() ())
+    ((5 8 1 2 9) (1 2 5 8 9))
+    ((1) (1))
+    ((9 8 7 6 5) (5 6 7 8 9))
+   ))
+
+(defvar sort-gene-pool
+  '(
+    'x 'y 'a 'b ;; variable names
+    '() ;; empty list literal
+    '#t '#f ;; booleans
+    ;; Core list operations
+    (car x) (cdr x) (cons x y) (list) (null? x)
+    ;; Control Flow
+    (if a b c)
+    ;; Comparison
+    (< x y)
+    ;; The function signature we are trying to evolve
+    (lambda (x) (if #t #f #f))
+   ))
+
+(defun generate-random-ast (gene-pool max-depth)
+  "Generates a single random AST."
+  (if (<= max-depth 0)
+      (random-choice '(x y a b ())) ;; Terminals
+      (let ((op (random-choice gene-pool)))
+        (if (list? op)
+            (map (lambda (node) (generate-random-ast gene-pool (- max-depth 1))) op)
+            op))))
+
+(defun generate-random-asts (count gene-pool max-depth)
+  "Generates a population of random ASTs."
+  (let ((population '()))
+    (loop count
+      (set! population (cons (generate-random-ast gene-pool max-depth) population)))
+    population))
+
+(defvar sort-problem-spec
+  (hash-map
+    'training-data sort-training-data
+    'gene-pool sort-gene-pool
+    'fitness-fn (lambda (ast) (multi-dimensional-fitness ast sort-training-data))
+    'initial-population (generate-random-asts 50 sort-gene-pool 4)
+    'mutation-rate 0.2
+    'elitism-count 5
+   ))
+
+;; --- Main Execution ---
+
+(defun main ()
+  (print "==============================================")
+  (print "  PROJECT PROMETHEUS LEGION: EVOLVE-A-SORTER  ")
+  (print "==============================================")
+  (print "Starting evolution of a sorting function...")
+  (let ((best-solution (evolve-solution sort-problem-spec 50))) ;; 50 generations
+    (print " ")
+    (print "Evolution complete!")
+    (print "----------------------------------------------")
+    (print "Best solution found:")
+    (print best-solution)
+    (print "----------------------------------------------")
+    ))
+
+;; Run it!
+(main)

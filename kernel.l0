@@ -35,3 +35,10 @@
       `(begin ,@body)
       `(let (,(car bindings))
          (let* ,(cdr bindings) ,@body))))
+
+(defmacro loop (count . body)
+  "A simple loop macro that executes body 'count' times, exposing '*loop-counter*'."
+  `(let ((*loop-counter* 0))
+     (while (< *loop-counter* ,count)
+       ,@body
+       (set! *loop-counter* (+ *loop-counter* 1)))))

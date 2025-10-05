@@ -1,0 +1,33 @@
+;; stdlib/analysis/deep-ast.l0
+;;
+;; Provides functions for deep analysis of Abstract Syntax Trees (ASTs).
+;; These are used by the genetic programming framework to evaluate the
+;; structural fitness of candidate solutions.
+
+(load "stdlib/core.l0")
+
+(defun walk-ast (ast visitor-fn)
+  "Traverses an AST in depth-first order and applies a visitor-fn to each node."
+  (visitor-fn ast)
+  (if (list? ast)
+      (map (lambda (node) (walk-ast node visitor-fn)) ast)
+      #f))
+
+(defun get-ast-depth (ast)
+  "Calculates the maximum nesting depth of an AST."
+  (if (not (list? ast))
+      0
+      (+ 1 (apply max (cons 0 (map get-ast-depth ast))))))
+
+(defun count-control-flow (ast)
+  "Counts control flow operators like 'if', 'cond', 'while'."
+  (let ((count 0))
+    (walk-ast ast (lambda (node)
+                    (if (and (list? node) (> (length node) 0) (member? (car node) '(if cond while)))
+                        (set! count (+ count 1))
+                        #f)))
+    count))
+
+(defun get-ast-complexity (ast)
+  "A simple cyclomatic complexity approximation based on control flow."
+  (+ 1 (count-control-flow ast)))

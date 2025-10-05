@@ -1,0 +1,110 @@
+;; bootstrap/structure-aware-evolver.l0
+;;
+;; Implements the structure-aware genetic programming engine.
+;; This engine evolves a population of programs towards a solution
+;; guided by a multi-dimensional fitness function that considers
+;; correctness, complexity, and structural properties.
+
+(load "stdlib/analysis/deep-ast.l0")
+(load "stdlib/gen-prog/core.l0")
+(load "stdlib/core.l0")
+
+(defun calculate-correctness (candidate-fn training-data)
+  "Returns a score from 0.0 (all wrong) to 1.0 (all correct)."
+  (let ((total-cases (length training-data))
+        (passed-cases 0))
+    (map (lambda (test-case)
+           (let ((input (car test-case))
+                 (expected (cadr test-case)))
+             (try
+               (if (equal? (apply candidate-fn input) expected)
+                   (set! passed-cases (+ passed-cases 1))
+                   #f)
+               (catch e #f)))) ; Penalize errors by not incrementing passed-cases
+         training-data)
+    (/ passed-cases total-cases)))
+
+(defun multi-dimensional-fitness (candidate-ast training-data)
+  "Calculates fitness based on correctness, complexity, and depth."
+  (let* ((candidate-fn (eval candidate-ast (kernel-env)))
+         (correctness (calculate-correctness candidate-fn training-data))
+         (complexity (get-ast-complexity candidate-ast))
+         (depth (get-ast-depth candidate-ast)))
+    ;; Heavily penalize incorrect solutions
+    (if (< correctness 1.0)
+        correctness ;; Score is just the correctness if not 100% correct
+        ;; If 100% correct, reward simplicity (lower complexity and depth is better)
+        (+ correctness (/ 1.0 (+ 1 complexity)) (/ 1.0 (+ 1 depth))))))
+
+(defun evolve-solution (problem-spec generations)
+  "The main evolutionary loop."
+  (let ((population (hash-get problem-spec 'initial-population))
+        (fitness-fn (hash-get problem-spec 'fitness-fn))
+        (gene-pool (hash-get problem-spec 'gene-pool))
+        (mutation-rate (hash-get problem-spec 'mutation-rate 0.1))
+        (elitism-count (hash-get problem-spec 'elitism-count 2)))
+
+    (loop generations
+      (print (string-append "Generation: " (lisp-str *loop-counter*)))
+
+      ;; 1. Evaluate Fitness
+      (let ((scores (map (lambda (ind) (fitness-fn ind)) population)))
+
+        ;; 2. Selection (Elitism + Tournament)
+        (let ((sorted-population (sort-by-score population scores))
+              (new-population '()))
+
+          ;; Keep the best 'elitism-count' individuals
+          (set! new-population (take sorted-population elitism-count))
+
+          ;; 3. Crossover and Mutation
+          (while (< (length new-population) (length population))
+            (let* ((parent1 (random-choice sorted-population))
+                   (parent2 (random-choice sorted-population))
+                   (child (crossover parent1 parent2))
+                   (mutated-child (mutate child gene-pool mutation-rate)))
+              (set! new-population (append new-population (list mutated-child)))))
+
+          (set! population new-population))))
+
+    ;; Return the best solution found
+    (let* ((final-scores (map (lambda (ind) (fitness-fn ind)) population))
+           (best-individual (car (sort-by-score population final-scores))))
+      best-individual)))
+
+;; --- Helper for sorting population by fitness ---
+(defun sort-by-score (items scores)
+  "Sorts a list of 'items' based on a parallel list of 'scores', descending."
+  (let ((pairs (zip items scores)))
+    ;; This is a simple bubble sort for demonstration.
+    ;; A real implementation would use a more efficient algorithm.
+    (let ((n (length pairs)))
+      (loop n
+        (loop (- n 1)
+          (let* ((j *loop-counter*)
+                 (pair1 (list-ref pairs j))
+                 (pair2 (list-ref pairs (+ j 1)))
+                 (score1 (cadr pair1))
+                 (score2 (cadr pair2)))
+            (if (< score1 score2)
+                (swap! pairs j (+ j 1)))))))
+    (map car pairs)))
+
+(defun zip (list1 list2)
+  (if (or (null? list1) (null? list2))
+      '()
+      (cons (list (car list1) (car list2))
+            (zip (cdr list1) (cdr list2)))))
+
+(defun take (a-list n)
+  (if (or (<= n 0) (null? a-list))
+      '()
+      (cons (car a-list) (take (cdr a-list) (- n 1)))))
+
+(defun swap! (a-list i j)
+  (let ((temp (list-ref a-list i)))
+    (list-set! a-list i (list-ref a-list j))
+    (list-set! a-list j temp)))
+
+;; Primitives `list-ref`, `list-set!` are assumed to exist for this to work.
+;; I will add them to the core environment.
