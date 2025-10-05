@@ -20,6 +20,17 @@ from .errors import LogosEvaluationError, LogosAssertionError
 L0_CACHE = {}
 L0_JIT_SEEN_ASTS = set()
 
+# Global counter for gensym
+_gensym_counter = 0
+_gensym_lock = threading.Lock()
+
+def _gensym(prefix: str = "g-") -> Symbol:
+    """Generates a new unique symbol with the given prefix."""
+    with _gensym_lock:
+        global _gensym_counter
+        _gensym_counter += 1
+        return Symbol(f"{prefix}{_gensym_counter}")
+
 # Thread-safe metrics store
 _metrics = defaultdict(list)
 _metrics_lock = threading.Lock()
@@ -107,6 +118,8 @@ def create_global_env(eval_func) -> Environment:
         Symbol('length'): len,
         Symbol('list'): lambda *x: list(x),
         Symbol('list?'): lambda x: isinstance(x, list),
+        Symbol('list-ref'): lambda lst, i: lst[i],
+        Symbol('list-set!'): lambda lst, i, val: lst.__setitem__(i, val),
         Symbol('map'): lambda proc, lst: list(map(proc, lst)),
         Symbol('max'): max,
         Symbol('min'): min,
@@ -116,6 +129,9 @@ def create_global_env(eval_func) -> Environment:
         Symbol('procedure?'): callable,
         Symbol('round'): round,
         Symbol('symbol?'): lambda x: isinstance(x, Symbol),
+        Symbol('gensym'): lambda: _gensym(),
+
+        Symbol('floor'): math.floor,
 
         # Math constants
         Symbol('pi'): math.pi,
@@ -133,7 +149,8 @@ def create_global_env(eval_func) -> Environment:
         Symbol('hash-contains?'): lambda d, k: k in d,
 
         # Orchestrator Primitives
-        Symbol('interpret'): lambda ast, env: eval_func(ast, env),
+        Symbol('eval'): lambda ast, env=env: eval_func(ast, env),
+        Symbol('kernel-env'): lambda: env,
         # --- MODIFIED: Ensure integer timestamp ---
         Symbol('current-time-ms'): lambda: int(time.time() * 1000),
         Symbol('random'): random.random,

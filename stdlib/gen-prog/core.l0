@@ -1,0 +1,51 @@
+;; stdlib/gen-prog/core.l0
+;;
+;; Provides the core operators for genetic programming, including
+;; AST crossover, mutation, and tree manipulation helpers.
+
+(load "stdlib/core.l0")
+
+(defun random-choice (a-list)
+  "Selects a random item from a list."
+  (if (null? a-list)
+      '()
+      (list-ref a-list (floor (* (random) (length a-list))))))
+
+(defun list-all-subtrees (ast)
+  "Returns a flat list of all subtrees within an AST, including the root."
+  (let ((subtrees '()))
+    (walk-ast ast (lambda (node) (set! subtrees (cons node subtrees))))
+    subtrees))
+
+(defun random-subtree (ast)
+  "Selects a random subtree from within an AST."
+  (random-choice (list-all-subtrees ast)))
+
+(defun replace-subtree (ast old new)
+  "Recursively reconstructs an AST, replacing a specific 'old' subtree with a 'new' one.
+  This is a non-mutating operation."
+  (if (equal? ast old)
+      new ;; If the current AST is the one we're looking for, replace it.
+      (if (list? ast)
+          ;; If it's a list, recursively process each element.
+          (map (lambda (node) (replace-subtree node old new)) ast)
+          ;; Otherwise, it's an atom and not the target, so return it unchanged.
+          ast)))
+
+(defun crossover (ast1 ast2)
+  "Performs a single-point crossover by swapping a random subtree between two ASTs."
+  (let ((subtree1 (random-subtree ast1))
+        (subtree2 (random-subtree ast2)))
+    ;; Replace subtree1 in ast1 with subtree2.
+    ;; Note: This is a simplified crossover. A more robust implementation might
+    ;; ensure that the swapped trees are of compatible types or roles.
+    (replace-subtree ast1 subtree1 subtree2)))
+
+(defun mutate (ast gene-pool mutation-rate)
+  "Applies mutation to an AST. With a probability of 'mutation-rate', it
+  replaces a random subtree in the AST with a random gene from the gene-pool."
+  (if (< (random) mutation-rate)
+      (let ((target-subtree (random-subtree ast))
+            (new-gene (random-choice gene-pool)))
+        (replace-subtree ast target-subtree new-gene))
+      ast))

@@ -169,6 +169,16 @@ def evaluate(x, env: Environment):
                 return True
         return val
 
+    elif op == 'while':
+        if len(args) < 2:
+            raise LogosEvaluationError(f"while form expects at least 2 arguments (condition and body), but got {len(args)}")
+        condition, *body = args
+        body_expr = [Symbol('begin')] + body
+        result = None
+        while evaluate(condition, env):
+            result = evaluate(body_expr, env)
+        return result
+
     elif op == 'load':
         (filepath_expr,) = args
         filepath = evaluate(filepath_expr, env)
@@ -184,6 +194,24 @@ def evaluate(x, env: Environment):
         for ast in asts:
             result = evaluate(ast, env)
         return result
+
+    elif op == 'try':
+        if len(args) != 2:
+            raise LogosEvaluationError(f"try form expects 2 arguments (body and a catch clause), but got {len(args)}")
+
+        body_expr, catch_clause = args
+
+        if not (isinstance(catch_clause, List) and len(catch_clause) == 3 and catch_clause[0] == 'catch'):
+            raise LogosEvaluationError("try form must be followed by a (catch <error-var> <body>) clause.")
+
+        _, error_var, catch_body = catch_clause
+
+        try:
+            return evaluate(body_expr, env)
+        except LogosEvaluationError as e:
+            catch_env = Environment(outer=env)
+            catch_env.define(error_var, str(e))
+            return evaluate(catch_body, catch_env)
 
     elif op == 'hash-map':
         if len(args) % 2 != 0:
